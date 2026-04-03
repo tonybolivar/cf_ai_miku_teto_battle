@@ -102,8 +102,9 @@ export class NoteEngine {
     };
   }
 
-  /** Check for notes that have passed the hit window — auto-miss */
-  checkMisses(songTime: number): JudgeOutput[] {
+  /** Check for notes that have passed the hit window — auto-miss.
+   *  Skips hold notes in lanes where the key is currently held. */
+  checkMisses(songTime: number, heldLanes?: Set<Lane>): JudgeOutput[] {
     const outerWindow = HIT_WINDOWS[HIT_WINDOWS.length - 1].window;
     const misses: JudgeOutput[] = [];
 
@@ -116,6 +117,11 @@ export class NoteEngine {
     for (const note of this.notes) {
       if (note.judged || note.isOpponent || note.holdActive) continue;
       if (holdLanes.has(note.lane)) continue;
+      // Don't auto-miss hold notes while the player is holding that key
+      if (note.duration > 0 && heldLanes?.has(note.lane)) {
+        // Only miss if the entire hold has passed
+        if (songTime <= note.time + note.duration) continue;
+      }
       if (songTime - note.time > outerWindow) {
         note.judged = true;
         misses.push({
@@ -158,7 +164,8 @@ export class NoteEngine {
     return null;
   }
 
-  /** Auto-activate hold notes when the player is already holding the key */
+  /** Auto-activate hold notes when the player is already holding the key.
+   *  Window extends from the normal hit window through the entire hold duration. */
   autoActivateHolds(songTime: number, heldLanes: Set<Lane>): JudgeOutput[] {
     const outerWindow = HIT_WINDOWS[HIT_WINDOWS.length - 1].window;
     const activated: JudgeOutput[] = [];
@@ -167,17 +174,19 @@ export class NoteEngine {
       if (note.judged || note.holdActive || note.isOpponent) continue;
       if (note.duration <= 0) continue;
       if (!heldLanes.has(note.lane)) continue;
-      // Note is within the hit window and player is holding the key
-      const diff = Math.abs(note.time - songTime);
-      if (diff <= outerWindow) {
+
+      const holdEnd = note.time + note.duration;
+      // Activate if: we're within the early hit window OR we've passed the start but the hold hasn't ended
+      const early = note.time - songTime;
+      const late = songTime - note.time;
+
+      if (early <= outerWindow && songTime <= holdEnd) {
         note.holdActive = true;
-        activated.push({
-          noteId: note.noteId,
-          result: diff <= 45 ? "sick" : diff <= 90 ? "good" : "bad",
-          points: diff <= 45 ? 350 : diff <= 90 ? 200 : 100,
-          healthDelta: diff <= 45 ? 0.023 : diff <= 90 ? 0.013 : -0.005,
-          lane: note.lane,
-        });
+        const diff = Math.abs(note.time - songTime);
+        const rating = diff <= 45 ? "sick" : diff <= 90 ? "good" : diff <= 166 ? "bad" : "good";
+        const points = { sick: 350, good: 200, bad: 100 }[rating] ?? 200;
+        const delta = { sick: 0.023, good: 0.013, bad: -0.005 }[rating] ?? 0.013;
+        activated.push({ noteId: note.noteId, result: rating, points, healthDelta: delta, lane: note.lane });
       }
     }
 

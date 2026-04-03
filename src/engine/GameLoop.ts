@@ -252,16 +252,8 @@ export class GameLoop {
 
     const songTime = this.audio.getSongTime() + (this.chart.chartOffset || 0);
 
-    // Check for auto-misses
-    const misses = this.playerNotes.checkMisses(songTime);
-    for (const miss of misses) {
-      this.state.applyPlayerHit("miss", 0, miss.healthDelta);
-      this.effects.showRating("miss", this.getPlayerCenterX(), this.getPopupY());
-      this.effects.shake();
-      this.pvpSend({ type: "miss", noteId: miss.noteId, lane: miss.lane });
-    }
-
     // Auto-activate hold notes when the player is already holding the key
+    // (must run BEFORE checkMisses so holds latch before being auto-missed)
     const heldLanes = new Set(([0, 1, 2, 3] as Lane[]).filter((l) => this.input.isHeld(l)));
     const autoHolds = this.playerNotes.autoActivateHolds(songTime, heldLanes);
     for (const h of autoHolds) {
@@ -271,6 +263,15 @@ export class GameLoop {
 
     // Auto-consume notes inside active holds (slide notes)
     const held = this.playerNotes.consumeHeldNotes(songTime);
+
+    // Check for auto-misses (after hold activation so holds aren't prematurely missed)
+    const misses = this.playerNotes.checkMisses(songTime, heldLanes);
+    for (const miss of misses) {
+      this.state.applyPlayerHit("miss", 0, miss.healthDelta);
+      this.effects.showRating("miss", this.getPlayerCenterX(), this.getPopupY());
+      this.effects.shake();
+      this.pvpSend({ type: "miss", noteId: miss.noteId, lane: miss.lane });
+    }
     for (const h of held) {
       this.state.applyPlayerHit(h.result, h.points, h.healthDelta);
       this.pvpSend({ type: "hit", noteId: h.noteId, rating: h.result as any, lane: h.lane });
