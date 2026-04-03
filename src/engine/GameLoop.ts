@@ -23,6 +23,7 @@ import {
   type Lane,
   type Character,
   type BotDifficulty,
+  DIFFICULTY_SCROLL_SPEED,
 } from "../types/game";
 import type { ServerMessage } from "../types/protocol";
 
@@ -76,6 +77,10 @@ export class GameLoop {
     this.renderer = new Renderer(config.noteCanvas);
     // Miku always on the left, Teto always on the right
     this.renderer.playerOnLeft = config.playerCharacter === "miku";
+    // Difficulty affects scroll speed
+    if (config.botDifficulty && DIFFICULTY_SCROLL_SPEED[config.botDifficulty]) {
+      this.renderer.scrollSpeed = DIFFICULTY_SCROLL_SPEED[config.botDifficulty];
+    }
 
     if (config.showHitWindows) {
       this.renderer.setShowHitWindows(true);

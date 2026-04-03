@@ -151,7 +151,8 @@ export class NoteEngine {
     return null;
   }
 
-  /** Auto-consume notes that fall within an active hold's duration */
+  /** Auto-consume notes that fall within an active hold's duration,
+   *  and auto-complete holds whose duration has fully elapsed. */
   consumeHeldNotes(songTime: number): JudgeOutput[] {
     const consumed: JudgeOutput[] = [];
 
@@ -159,11 +160,11 @@ export class NoteEngine {
       if (!hold.holdActive) continue;
       const holdEnd = hold.time + hold.duration;
 
+      // Auto-consume overlapping notes in the same lane
       for (const note of this.notes) {
         if (note === hold || note.judged || note.isOpponent) continue;
         if (note.lane !== hold.lane) continue;
-        // Note falls within the hold's time span and we've reached it
-        if (note.time > hold.time && note.time <= holdEnd && songTime >= note.time) {
+        if (note.time > hold.time && note.time <= holdEnd + 50 && songTime >= note.time) {
           note.judged = true;
           // If the consumed note is itself a hold, extend the current hold
           if (note.duration > 0) {
@@ -177,6 +178,20 @@ export class NoteEngine {
             lane: note.lane,
           });
         }
+      }
+
+      // Auto-complete hold when its duration has elapsed (player still holding)
+      if (songTime >= holdEnd) {
+        hold.holdActive = false;
+        hold.holdReleased = true;
+        hold.judged = true;
+        consumed.push({
+          noteId: hold.noteId,
+          result: "sick",
+          points: 350,
+          healthDelta: 0.023,
+          lane: hold.lane,
+        });
       }
     }
 

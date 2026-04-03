@@ -113,3 +113,9 @@ export const CHARACTER_COLORS = {
 export type Character = "miku" | "teto";
 export type GameMode = "pvp" | "bot";
 export type BotDifficulty = "easy" | "medium" | "hard";
+
+export const DIFFICULTY_SCROLL_SPEED: Record<BotDifficulty, number> = {
+  easy: 0.45,
+  medium: 0.6,
+  hard: 0.8,
+};

@@ -22,6 +22,7 @@ export class Renderer {
   private showHitWindows = false;
   /** When true, player highway is on the left side */
   playerOnLeft = false;
+  scrollSpeed = SCROLL_SPEED;
 
   constructor(canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d")!;
@@ -79,7 +80,7 @@ export class Renderer {
     this.drawReceptors(ctx, playerX, highwayTop, input);
 
     // Draw notes (visible window = ~1500ms ahead)
-    const windowMs = HIGHWAY_HEIGHT / SCROLL_SPEED + 200;
+    const windowMs = HIGHWAY_HEIGHT / this.scrollSpeed + 200;
 
     // Opponent notes
     const opponentNotes = opponentEngine.getVisibleNotes(songTime, windowMs);
@@ -199,14 +200,14 @@ export class Renderer {
 
     // Notes scroll upward: future notes are below, past notes are above
     const receptorY = highwayTop + RECEPTOR_Y;
-    const y = receptorY + (noteTime - songTime) * SCROLL_SPEED;
+    const y = receptorY + (noteTime - songTime) * this.scrollSpeed;
 
     // Skip if off-screen
     if (y < highwayTop - NOTE_SIZE || y > highwayTop + HIGHWAY_HEIGHT + NOTE_SIZE) return;
 
     // Draw hold tail first (below the arrow)
     if (duration > 0) {
-      const tailEndY = receptorY + (noteTime + duration - songTime) * SCROLL_SPEED;
+      const tailEndY = receptorY + (noteTime + duration - songTime) * this.scrollSpeed;
       this.drawHoldBar(ctx, laneX, y, tailEndY, color);
     }
 
@@ -270,8 +271,8 @@ export class Renderer {
     const laneX = highwayX + lane * LANE_WIDTH + LANE_WIDTH / 2;
     const receptorY = highwayTop + RECEPTOR_Y;
 
-    const startY = Math.max(receptorY, receptorY + (noteStart - songTime) * SCROLL_SPEED);
-    const endY = receptorY + (noteEnd - songTime) * SCROLL_SPEED;
+    const startY = Math.max(receptorY, receptorY + (noteStart - songTime) * this.scrollSpeed);
+    const endY = receptorY + (noteEnd - songTime) * this.scrollSpeed;
 
     this.drawHoldBar(ctx, laneX, startY, endY, color);
   }
@@ -290,7 +291,7 @@ export class Renderer {
     ];
 
     for (const w of windows) {
-      const h = w.ms * SCROLL_SPEED * 2;
+      const h = w.ms * this.scrollSpeed * 2;
       ctx.fillStyle = w.color;
       ctx.fillRect(x, receptorY - h / 2, HIGHWAY_WIDTH, h);
     }

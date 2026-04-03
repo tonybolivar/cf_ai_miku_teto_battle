@@ -11,6 +11,7 @@ import LeaderboardScreen from "./screens/LeaderboardScreen";
 import { PO_PI_PO_CHART } from "./data/charts/po_pi_po";
 import { MESMERIZER_CHART } from "./data/charts/mesmerizer";
 import { SONG_LIST, SONG_ASSETS } from "./data/songs";
+import { applyDifficulty } from "./utils/chartDifficulty";
 import type { Character, GameMode, BotDifficulty, Chart } from "./types/game";
 
 type Screen =
@@ -87,9 +88,9 @@ export default function App() {
   const handleSongSelect = useCallback(async (songId: string) => {
     setConfig((c) => ({ ...c, songId }));
     const loaded = await loadChart(songId);
-    setChart(loaded);
+    setChart(applyDifficulty(loaded, config.botDifficulty));
     setScreen("trashTalk");
-  }, []);
+  }, [config.botDifficulty]);
 
   // ── Multiplayer flow (lobby handles char select + song) ──
 
