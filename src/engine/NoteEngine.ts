@@ -82,6 +82,10 @@ export class NoteEngine {
     }
 
     // Outside all windows but within outer — SHIT
+    if (closest.duration > 0) {
+      closest.judged = false;
+      closest.holdActive = true;
+    }
     return {
       noteId: closest.noteId,
       result: "shit",
@@ -96,8 +100,15 @@ export class NoteEngine {
     const outerWindow = HIT_WINDOWS[HIT_WINDOWS.length - 1].window;
     const misses: JudgeOutput[] = [];
 
+    // Find lanes with active holds — don't auto-miss upcoming notes in those lanes
+    const holdLanes = new Set<Lane>();
+    for (const note of this.notes) {
+      if (note.holdActive) holdLanes.add(note.lane);
+    }
+
     for (const note of this.notes) {
       if (note.judged || note.isOpponent || note.holdActive) continue;
+      if (holdLanes.has(note.lane)) continue;
       if (songTime - note.time > outerWindow) {
         note.judged = true;
         misses.push({
