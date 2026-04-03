@@ -20,6 +20,8 @@ export class Renderer {
   private width: number;
   private height: number;
   private showHitWindows = false;
+  /** When true, player highway is on the left side */
+  playerOnLeft = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d")!;
@@ -55,9 +57,12 @@ export class Renderer {
     ctx.clearRect(-10, -10, this.width + 20, this.height + 20);
 
     // Calculate positions — highways pushed to screen edges
+    // Miku is always on the left, Teto on the right
     const edgePadding = 30;
-    const opponentX = edgePadding;
-    const playerX = this.width - HIGHWAY_WIDTH - edgePadding;
+    const leftX = edgePadding;
+    const rightX = this.width - HIGHWAY_WIDTH - edgePadding;
+    const playerX = this.playerOnLeft ? leftX : rightX;
+    const opponentX = this.playerOnLeft ? rightX : leftX;
     const highwayTop = 20;
 
     // Draw highways (dark backgrounds so arrows pop over video)

@@ -74,6 +74,8 @@ export class GameLoop {
     this.config = config;
     this.chart = config.chart;
     this.renderer = new Renderer(config.noteCanvas);
+    // Miku always on the left, Teto always on the right
+    this.renderer.playerOnLeft = config.playerCharacter === "miku";
 
     if (config.showHitWindows) {
       this.renderer.setShowHitWindows(true);
@@ -151,17 +153,19 @@ export class GameLoop {
         const playerMMD = songAssets.mmdModels[this.config.playerCharacter];
         const opponentMMD = isSolo ? undefined : songAssets.mmdModels[this.config.opponentCharacter];
 
+        // Miku always left, Teto always right
+        const mikuIsPlayer = this.config.playerCharacter === "miku";
         const mmdLoads: Promise<void>[] = [];
         if (playerMMD) {
           const pos = nativeScale
             ? new THREE.Vector3(0, 0, 0) // camera VMD handles framing
-            : new THREE.Vector3(isSolo ? 0 : 0.25, 0, 0);
+            : new THREE.Vector3(isSolo ? 0 : (mikuIsPlayer ? -0.25 : 0.25), 0, 0);
           mmdLoads.push(this.vrm.loadMMDCharacter("player", playerMMD.pmx, playerMMD.vmd, pos, nativeScale));
         }
         if (opponentMMD) {
           const pos = nativeScale
             ? new THREE.Vector3(5, 0, 0) // offset in MMD units (~40cm)
-            : new THREE.Vector3(-0.25, 0, 0);
+            : new THREE.Vector3(mikuIsPlayer ? 0.25 : -0.25, 0, 0);
           mmdLoads.push(this.vrm.loadMMDCharacter("opponent", opponentMMD.pmx, opponentMMD.vmd, pos, nativeScale));
         }
 
@@ -186,12 +190,15 @@ export class GameLoop {
         }
       } else {
         // Load VRM characters (default)
+        // Miku always on the left (-0.8), Teto always on the right (0.8)
+        const playerX = this.config.playerCharacter === "miku" ? -0.8 : 0.8;
+        const opponentX = this.config.playerCharacter === "miku" ? 0.8 : -0.8;
         const vrmLoads: Promise<void>[] = [];
         if (this.config.playerVrmUrl) {
-          vrmLoads.push(this.vrm.loadCharacter("player", this.config.playerVrmUrl, new THREE.Vector3(0.8, 0, 0)));
+          vrmLoads.push(this.vrm.loadCharacter("player", this.config.playerVrmUrl, new THREE.Vector3(playerX, 0, 0)));
         }
         if (this.config.opponentVrmUrl) {
-          vrmLoads.push(this.vrm.loadCharacter("opponent", this.config.opponentVrmUrl, new THREE.Vector3(-0.8, 0, 0)));
+          vrmLoads.push(this.vrm.loadCharacter("opponent", this.config.opponentVrmUrl, new THREE.Vector3(opponentX, 0, 0)));
         }
         await Promise.all(vrmLoads);
 
@@ -391,11 +398,17 @@ export class GameLoop {
 
   private getPlayerCenterX(): number {
     const edgePadding = 30;
+    if (this.renderer.playerOnLeft) {
+      return edgePadding + HIGHWAY_WIDTH / 2;
+    }
     return this.canvasWidth - HIGHWAY_WIDTH - edgePadding + HIGHWAY_WIDTH / 2;
   }
 
   private getPlayerLaneX(lane: Lane): number {
     const edgePadding = 30;
+    if (this.renderer.playerOnLeft) {
+      return edgePadding + lane * LANE_WIDTH + LANE_WIDTH / 2;
+    }
     return this.canvasWidth - HIGHWAY_WIDTH - edgePadding + lane * LANE_WIDTH + LANE_WIDTH / 2;
   }
 

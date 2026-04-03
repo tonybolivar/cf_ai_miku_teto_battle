@@ -104,7 +104,6 @@ async function handleApi(
       playerCharacter: string;
       opponentCharacter: string;
       songTitle: string;
-      playerName?: string;
     };
 
     // Check if AI binding exists
@@ -116,13 +115,12 @@ async function handleApi(
 
     try {
       const oppName = body.opponentCharacter === "miku" ? "Hatsune Miku" : "Kasane Teto";
-      const playerName = body.playerName || body.playerCharacter;
 
       const systemPrompt = `You are ${oppName} from the Vocaloid universe.
 Your opponent just picked ${body.playerCharacter} and challenged you to a rhythm battle on "${body.songTitle}".
-Write one short trash talk line, 1-2 sentences max.
+Write one short trash talk line in Japanese, 1-2 sentences max.
 Stay fully in character. Be playful and confident, not cruel.
-Do not use quotation marks in your response.${body.playerName ? `\nTheir name is ${body.playerName}.` : ""}`;
+Do not use quotation marks in your response. Write only in Japanese.`;
 
       const stream = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast" as any, {
         messages: [
@@ -223,7 +221,7 @@ async function handleWebSocket(
 
 function getFallbackTrashTalk(opponent: string, player: string): string {
   if (opponent === "miku") {
-    return `Oh, you picked ${player}? How cute. Watch me steal the show like I always do~`;
+    return `あら、${player}を選んだの？可愛いね～。いつも通り、このステージは私のものよ♪`;
   }
-  return `Hah, ${player} thinks they can keep up with these twin drills? Think again!`;
+  return `ふふっ、${player}がこのツインドリルについてこれると思ってるの？甘いわね！`;
 }

@@ -21,6 +21,7 @@ interface LobbyState {
   phase: Phase;
   startAt: number | null;
   createdAt: number;
+  rematchRequests: PlayerSlot[];
 }
 
 function clamp(val: number, min: number, max: number): number {
@@ -45,6 +46,7 @@ export class LobbyDO implements DurableObject {
     phase: "waiting",
     startAt: null,
     createdAt: Date.now(),
+    rematchRequests: [],
   };
 
   private idleTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -181,6 +183,10 @@ export class LobbyDO implements DurableObject {
         this.sendTo(otherSlot, { type: "chat", from: slot, text });
         break;
       }
+
+      case "rematch":
+        this.handleRematch(slot);
+        break;
     }
   }
 
@@ -324,6 +330,7 @@ export class LobbyDO implements DurableObject {
   private finishMatch(winner: PlayerSlot | "draw"): void {
     if (this.state.phase === "finished") return;
     this.state.phase = "finished";
+    this.state.rematchRequests = [];
 
     if (this.matchTimeout) clearTimeout(this.matchTimeout);
 
@@ -336,6 +343,52 @@ export class LobbyDO implements DurableObject {
 
     // Write to leaderboard (fire and forget)
     // TODO: ctx.waitUntil when KV is configured
+
+    this.saveState();
+  }
+
+  private handleRematch(slot: PlayerSlot): void {
+    if (this.state.phase !== "finished") return;
+    if (this.state.rematchRequests.includes(slot)) return;
+
+    this.state.rematchRequests.push(slot);
+    // Tell both players the current count
+    this.broadcast({ type: "rematch_update", count: this.state.rematchRequests.length });
+
+    if (this.state.rematchRequests.length >= 2) {
+      // Both want rematch — reset and restart
+      const freshPlayer = (): PlayerState => ({
+        character: "miku",
+        health: 1.0,
+        score: 0,
+        combo: 0,
+        misses: 0,
+        ready: false,
+      });
+
+      if (this.state.p1) {
+        const char = this.state.p1.character;
+        this.state.p1 = { ...freshPlayer(), character: char };
+      }
+      if (this.state.p2) {
+        const char = this.state.p2.character;
+        this.state.p2 = { ...freshPlayer(), character: char };
+      }
+
+      this.state.rematchRequests = [];
+      this.state.phase = "countdown";
+      this.state.startAt = Date.now() + 3000;
+
+      this.broadcast({
+        type: "rematch_start",
+        startAt: this.state.startAt,
+      });
+
+      setTimeout(() => {
+        this.state.phase = "playing";
+        this.saveState();
+      }, 3000);
+    }
 
     this.saveState();
   }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { CHARACTER_COLORS, type Character } from "../types/game";
 import PvpChat from "../components/PvpChat";
 
@@ -12,6 +12,7 @@ interface ResultsScreenProps {
   playerMisses: number;
   pvpWs?: WebSocket | null;
   onPlayAgain: () => void;
+  onRematch: (startAt: number) => void;
   onLeaderboard: () => void;
   onTitle: () => void;
 }
@@ -26,11 +27,34 @@ export default function ResultsScreen({
   playerMisses,
   pvpWs,
   onPlayAgain,
+  onRematch,
   onLeaderboard,
   onTitle,
 }: ResultsScreenProps) {
   const [name, setName] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [rematchCount, setRematchCount] = useState(0);
+  const [rematchSent, setRematchSent] = useState(false);
+
+  // Listen for rematch messages from the server
+  useEffect(() => {
+    if (!pvpWs) return;
+    const handler = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "rematch_update") setRematchCount(msg.count);
+        if (msg.type === "rematch_start") onRematch(msg.startAt);
+      } catch { /* ignore */ }
+    };
+    pvpWs.addEventListener("message", handler);
+    return () => pvpWs.removeEventListener("message", handler);
+  }, [pvpWs, onRematch]);
+
+  const handleRematch = useCallback(() => {
+    if (!pvpWs || pvpWs.readyState !== WebSocket.OPEN || rematchSent) return;
+    pvpWs.send(JSON.stringify({ type: "rematch" }));
+    setRematchSent(true);
+  }, [pvpWs, rematchSent]);
 
   const winColor = winner === "player" ? "#12FA05" : winner === "opponent" ? "#F9393F" : "#FFB800";
   const winText = winner === "player" ? "YOU WIN!" : winner === "opponent" ? "YOU LOSE!" : "DRAW!";
@@ -118,7 +142,15 @@ export default function ResultsScreen({
 
       {/* Nav buttons */}
       <div style={{ display: "flex", gap: 20 }}>
-        <NavButton label="PLAY AGAIN" onClick={onPlayAgain} />
+        {pvpWs ? (
+          <NavButton
+            label={rematchSent ? `REMATCH? ${rematchCount}/2` : "REMATCH"}
+            onClick={handleRematch}
+            active={rematchSent}
+          />
+        ) : (
+          <NavButton label="PLAY AGAIN" onClick={onPlayAgain} />
+        )}
         <NavButton label="LEADERBOARD" onClick={onLeaderboard} />
         <NavButton label="TITLE" onClick={onTitle} />
       </div>
@@ -156,18 +188,19 @@ function ScoreCard({ label, score, color, highlight }: {
   );
 }
 
-function NavButton({ label, onClick }: { label: string; onClick: () => void }) {
+function NavButton({ label, onClick, active }: { label: string; onClick: () => void; active?: boolean }) {
+  const borderColor = active ? "#12FA05" : "#333";
   return (
     <button
       onClick={onClick}
       style={{
-        padding: "12px 24px", background: "none", border: "2px solid #333",
-        borderRadius: 6, color: "#FFF", fontSize: "0.9rem",
+        padding: "12px 24px", background: "none", border: `2px solid ${borderColor}`,
+        borderRadius: 6, color: active ? "#12FA05" : "#FFF", fontSize: "0.9rem",
         fontFamily: '"Noto Sans JP", sans-serif', cursor: "pointer",
-        transition: "border-color 0.15s",
+        transition: "border-color 0.15s, color 0.15s",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#888")}
-      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#333")}
+      onMouseEnter={(e) => { if (!active) e.currentTarget.style.borderColor = "#888"; }}
+      onMouseLeave={(e) => { if (!active) e.currentTarget.style.borderColor = "#333"; }}
     >
       {label}
     </button>

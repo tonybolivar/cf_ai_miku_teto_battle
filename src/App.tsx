@@ -4,7 +4,7 @@ import CharacterSelect from "./screens/CharacterSelect";
 import ModeSelect from "./screens/ModeSelect";
 import SongSelect from "./screens/SongSelect";
 import LobbyScreen from "./screens/LobbyScreen";
-import CatFaceScreen from "./screens/CatFaceScreen";
+import TrashTalkScreen from "./screens/TrashTalkScreen";
 import CountdownScreen from "./screens/CountdownScreen";
 import GameScreen from "./screens/GameScreen";
 import ResultsScreen from "./screens/ResultsScreen";
@@ -20,7 +20,7 @@ type Screen =
   | "modeSelect"
   | "songSelect"
   | "lobby"
-  | "catFace"
+  | "trashTalk"
   | "countdown"
   | "game"
   | "results"
@@ -98,7 +98,7 @@ export default function App() {
     if (config.mode === "pvp") {
       setScreen("lobby");
     } else {
-      setScreen("catFace");
+      setScreen("trashTalk");
     }
   }, [config.mode]);
 
@@ -141,8 +141,17 @@ export default function App() {
         />
       );
 
-    case "catFace":
-      return <CatFaceScreen onDone={() => setScreen("game")} />;
+    case "trashTalk": {
+      const songMeta = SONG_LIST.find((s) => s.id === config.songId);
+      return (
+        <TrashTalkScreen
+          opponentCharacter={config.opponentCharacter}
+          playerCharacter={config.character}
+          songTitle={songMeta?.title ?? config.songId}
+          onDone={() => setScreen("game")}
+        />
+      );
+    }
 
     case "game": {
       // Default VRMs, overridden by song-specific assets
@@ -187,6 +196,10 @@ export default function App() {
           playerMisses={result?.playerMisses ?? 0}
           pvpWs={pvpInfo?.ws}
           onPlayAgain={() => { closePvp(); setScreen("game"); }}
+          onRematch={(startAt) => {
+            if (pvpInfo) setPvpInfo({ ...pvpInfo, startAt });
+            setScreen("game");
+          }}
           onLeaderboard={() => { closePvp(); setScreen("leaderboard"); }}
           onTitle={() => { closePvp(); setScreen("title"); }}
         />

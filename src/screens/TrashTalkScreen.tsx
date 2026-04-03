@@ -5,7 +5,6 @@ interface TrashTalkScreenProps {
   opponentCharacter: Character;
   playerCharacter: Character;
   songTitle: string;
-  playerName?: string;
   onDone: () => void;
 }
 
@@ -13,7 +12,6 @@ export default function TrashTalkScreen({
   opponentCharacter,
   playerCharacter,
   songTitle,
-  playerName,
   onDone,
 }: TrashTalkScreenProps) {
   const [text, setText] = useState("");
@@ -35,7 +33,6 @@ export default function TrashTalkScreen({
             playerCharacter,
             opponentCharacter,
             songTitle,
-            playerName,
           }),
           signal: controller.signal,
         });
@@ -50,12 +47,29 @@ export default function TrashTalkScreen({
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
         let fullText = "";
+        let buffer = "";
 
         while (true) {
           const { done: streamDone, value } = await reader.read();
           if (streamDone) break;
-          fullText += decoder.decode(value, { stream: true });
-          setText(fullText);
+          buffer += decoder.decode(value, { stream: true });
+
+          // Parse SSE lines: "data: {\"response\":\"token\"}\n\n"
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const payload = trimmed.slice(5).trim();
+            if (payload === "[DONE]") continue;
+            try {
+              const json = JSON.parse(payload);
+              if (json.response) {
+                fullText += json.response;
+                setText(fullText);
+              }
+            } catch { /* skip malformed */ }
+          }
         }
         setDone(true);
       } catch (e) {
@@ -68,7 +82,7 @@ export default function TrashTalkScreen({
 
     fetchTrashTalk();
     return () => controller.abort();
-  }, [opponentCharacter, playerCharacter, songTitle, playerName]);
+  }, [opponentCharacter, playerCharacter, songTitle]);
 
   // Skip with Enter
   useEffect(() => {
@@ -144,12 +158,12 @@ export default function TrashTalkScreen({
 function getFallbackTrashTalk(opponent: Character, player: Character): string {
   const lines: Record<Character, Record<Character, string>> = {
     miku: {
-      teto: "Oh, you picked Teto? How cute. Watch me steal the show like I always do~",
-      miku: "Another me? There can only be one diva on this stage!",
+      teto: "あら、テトを選んだの？可愛いね～。いつも通り、このステージは私のものよ♪",
+      miku: "もう一人の私？このステージにディーバは一人だけよ！",
     },
     teto: {
-      miku: "Hah, Miku thinks she can keep up with these twin drills? Think again, leek girl!",
-      teto: "Wait, another Teto?! This stage isn't big enough for both of us!",
+      miku: "ふふっ、ミクがこのツインドリルについてこれると思ってるの？甘いわね、ネギ少女！",
+      teto: "えっ、もう一人のテト？！このステージは二人には狭すぎるわよ！",
     },
   };
   return lines[opponent][player];

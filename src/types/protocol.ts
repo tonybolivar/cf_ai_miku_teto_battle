@@ -8,7 +8,8 @@ export type ClientMessage =
   | { type: "hit"; noteId: string; rating: Rating; lane: Lane }
   | { type: "miss"; noteId: string; lane: Lane }
   | { type: "hold_end"; noteId: string; completed: boolean }
-  | { type: "chat"; text: string };
+  | { type: "chat"; text: string }
+  | { type: "rematch" };
 
 // ── Server → Client ──
 
@@ -21,4 +22,6 @@ export type ServerMessage =
   | { type: "your_health"; health: number }
   | { type: "opponent_sing"; lane: Lane }
   | { type: "finish"; winner: "p1" | "p2" | "draw"; p1Score: number; p2Score: number }
-  | { type: "chat"; from: "p1" | "p2"; text: string };
+  | { type: "chat"; from: "p1" | "p2"; text: string }
+  | { type: "rematch_update"; count: number }
+  | { type: "rematch_start"; startAt: number };
