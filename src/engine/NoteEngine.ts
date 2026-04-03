@@ -32,10 +32,10 @@ export class NoteEngine {
     this.lastMissCheck = 0;
   }
 
-  /** Get notes visible in the current scroll window */
+  /** Get notes visible in the current scroll window (excludes active holds) */
   getVisibleNotes(songTime: number, windowMs: number): TrackedNote[] {
     return this.notes.filter(
-      (n) => !n.judged && n.time >= songTime - 300 && n.time <= songTime + windowMs
+      (n) => !n.judged && !n.holdActive && n.time >= songTime - 300 && n.time <= songTime + windowMs
     );
   }
 
