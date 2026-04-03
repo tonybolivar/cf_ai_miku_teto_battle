@@ -14,9 +14,8 @@
       { "name": "LOBBY", "class_name": "LobbyDO" }
     ]
   },
-  // KV and AI bindings added when deploying (require wrangler login)
-  // "kv_namespaces": [{ "binding": "LEADERBOARD", "id": "..." }],
-  // "ai": { "binding": "AI" },
+  "kv_namespaces": [{ "binding": "LEADERBOARD", "id": "ccfd4012438c46cd8895b14d9eefe4ba" }],
+  "ai": { "binding": "AI" },
   "vars": {
     "LEADERBOARD_SECRET": "dev-secret-change-in-production"
   },

@@ -64,7 +64,7 @@ export const SONG_ASSETS: Record<string, SongAssets> = {
       },
       teto: {
         pmx: "/assets/mmd/teto/tetitm001.pmx",
-        vmd: ["/assets/vmd/teto_mesmerizer.vmd", "/assets/vmd/facial_teto_mesmerizer.vmd"],
+        vmd: ["/assets/vmd/teto_mesmerizer.vmd.gz", "/assets/vmd/facial_teto_mesmerizer.vmd"],
       },
     },
     backgroundVideo: "/assets/bg_mesmerizer.mp4",
