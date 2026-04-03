@@ -18,7 +18,7 @@ function generate(): Chart {
 
   const startTime = 4000; // grace period after GO!
 
-  for (let beat = 0; beat < 280; beat++) {
+  for (let beat = 0; beat < 360; beat++) {
     const time = startTime + beat * beatMs;
     let section: number;
 
@@ -29,7 +29,9 @@ function generate(): Chart {
     else if (beat < 176) section = 1; // verse 2
     else if (beat < 224) section = 2; // chorus 2
     else if (beat < 248) section = 3; // bridge 2
-    else section = 2;                 // final chorus
+    else if (beat < 300) section = 2; // final chorus
+    else if (beat < 330) section = 1; // outro verse
+    else section = 2;                 // outro chorus
 
     let pp: Lane[], op: Lane[];
     switch (section) {

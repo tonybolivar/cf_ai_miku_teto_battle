@@ -42,6 +42,8 @@ export default function GameScreen({
   const assets = songId ? SONG_ASSETS[songId] : undefined;
   const bgVideo = assets?.backgroundVideo;
   const [error, setError] = useState<string | null>(null);
+  const [quitProgress, setQuitProgress] = useState(0); // 0-100
+  const quitTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const snapshot = useGameState(gameLoopRef.current?.state ?? null);
 
@@ -152,6 +154,53 @@ export default function GameScreen({
     return () => clearTimeout(timer);
   }, [phase, countdown]);
 
+  // Hold Backspace to quit
+  useEffect(() => {
+    if (phase !== "playing") return;
+
+    const QUIT_DURATION = 1500; // ms to hold
+    const TICK = 50;
+
+    const onDown = (e: KeyboardEvent) => {
+      if (e.key !== "Backspace" || e.repeat) return;
+      e.preventDefault();
+      setQuitProgress(0);
+      quitTimerRef.current = setInterval(() => {
+        setQuitProgress((p) => {
+          const next = p + (TICK / QUIT_DURATION) * 100;
+          if (next >= 100) {
+            // Quit
+            if (quitTimerRef.current) clearInterval(quitTimerRef.current);
+            const loop = gameLoopRef.current;
+            if (loop) {
+              loop.stop();
+              onGameOver("opponent", loop.state.score, loop.state.opponentScore, loop.state.maxCombo, loop.state.misses);
+            }
+            return 100;
+          }
+          return next;
+        });
+      }, TICK);
+    };
+
+    const onUp = (e: KeyboardEvent) => {
+      if (e.key !== "Backspace") return;
+      if (quitTimerRef.current) {
+        clearInterval(quitTimerRef.current);
+        quitTimerRef.current = null;
+      }
+      setQuitProgress(0);
+    };
+
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    return () => {
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
+      if (quitTimerRef.current) clearInterval(quitTimerRef.current);
+    };
+  }, [phase, onGameOver]);
+
   const playerColor = CHARACTER_COLORS[playerCharacter];
   const opponentColor = CHARACTER_COLORS[opponentCharacter];
 
@@ -252,6 +301,31 @@ export default function GameScreen({
           <span>MISSES: {snapshot.misses}</span>
         </div>
       </div>
+
+      {/* Quit overlay */}
+      {quitProgress > 0 && (
+        <div style={{
+          position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+          zIndex: 20, textAlign: "center",
+        }}>
+          <div style={{
+            background: "rgba(0,0,0,0.85)", padding: "16px 32px", borderRadius: 10,
+            border: "2px solid #F9393F44",
+          }}>
+            <p style={{ color: "#F9393F", fontSize: "1.2rem", marginBottom: 10 }}>
+              Quitting... Hold Backspace
+            </p>
+            <div style={{
+              width: 200, height: 6, background: "#333", borderRadius: 3, overflow: "hidden",
+            }}>
+              <div style={{
+                width: `${quitProgress}%`, height: "100%", background: "#F9393F",
+                transition: "width 50ms linear",
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Loading overlay */}
       {phase === "loading" && (

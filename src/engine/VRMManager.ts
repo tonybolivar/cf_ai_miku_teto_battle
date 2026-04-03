@@ -77,8 +77,8 @@ export class VRMManager {
     // Character scene (foreground, transparent background)
     this.charScene = new THREE.Scene();
 
-    this.charCamera = new THREE.PerspectiveCamera(25, 1, 0.1, 100);
-    this.charCamera.position.set(0, 1.2, 4);
+    this.charCamera = new THREE.PerspectiveCamera(25, 1, 1, 10000);
+    this.charCamera.position.set(0, 15, 50);
     this.charCamera.lookAt(0, 1, 0);
 
     // Character lighting -- even on both sides for MMD toon materials
@@ -148,19 +148,18 @@ export class VRMManager {
     pmxUrl: string,
     vmdUrls: string[],
     position: THREE.Vector3,
-    rotationY = Math.PI,
+    nativeScale = false,
   ): Promise<void> {
     const mmd = await loadMMDCharacter(pmxUrl, vmdUrls);
 
-    // Scale and position -- PMX models are ~20 units tall
-    const scale = 0.08;
-    mmd.mesh.scale.setScalar(scale);
+    if (!nativeScale) {
+      mmd.mesh.scale.setScalar(0.08);
+    }
     mmd.mesh.position.copy(position);
-    mmd.mesh.rotation.y = 0; // PMX models face -Z by default, camera is at +Z
 
     this.charScene.add(mmd.mesh);
     this.mmdCharacters.set(id, mmd);
-    console.log(`[VRM] MMD character "${id}" loaded at`, position);
+    console.log(`[VRM] MMD character "${id}" loaded, nativeScale=${nativeScale}`);
   }
 
   /** Apply a pre-built AnimationClip as the dance for a character */
@@ -203,6 +202,11 @@ export class VRMManager {
     // Update MMD characters (native animation, no manual poses)
     for (const [, mmd] of this.mmdCharacters) {
       mmd.helper.update(delta);
+    }
+
+    // Update camera animation if present
+    if (this._cameraHelper) {
+      this._cameraHelper.update(delta);
     }
 
     // Update stage crossfade
@@ -340,7 +344,64 @@ export class VRMManager {
     }
   }
 
+  /** Load a PMX stage (static, no animation) */
+  async loadMMDStage(pmxUrl: string, nativeScale = false): Promise<void> {
+    const { MMDLoader } = await import("three-stdlib");
+    const loader = new MMDLoader();
+    const mesh = await new Promise<THREE.SkinnedMesh>((resolve, reject) => {
+      loader.load(pmxUrl, (m: any) => resolve(m), undefined, reject);
+    });
+    if (!nativeScale) {
+      mesh.scale.setScalar(0.08);
+      mesh.position.set(0, 0, -1);
+    }
+    this.charScene.add(mesh);
+    console.log(`[VRM] MMD stage loaded: ${pmxUrl}, nativeScale=${nativeScale}`);
+  }
+
+  /** Load a VMD camera animation */
+  async loadMMDCamera(vmdUrl: string): Promise<void> {
+    const { MMDLoader, MMDAnimationHelper } = await import("three-stdlib");
+    const loader = new MMDLoader();
+
+    const vmd = await new Promise<any>((resolve, reject) => {
+      loader.loadVMD(vmdUrl, resolve, undefined, reject);
+    });
+
+    // Create a camera animation helper
+    const cameraHelper = new MMDAnimationHelper({ afterglow: 0 });
+    const animation = (loader as any).animationBuilder.buildCameraAnimation(vmd);
+    cameraHelper.add(this.charCamera as any, { animation, physics: false });
+
+    // Store the helper to update each frame
+    this._cameraHelper = cameraHelper;
+    console.log(`[VRM] Camera VMD loaded: ${vmdUrl}`);
+  }
+
+  private _cameraHelper: any = null;
+
+  setCameraMMD(): void {
+    // Native MMD scale: character ~20 units tall
+    this.charCamera.near = 1;
+    this.charCamera.far = 10000;
+    this.charCamera.position.set(0, 12, 45);
+    this.charCamera.lookAt(0, 10, 0);
+    this.charCamera.fov = 30;
+    this.charCamera.updateProjectionMatrix();
+  }
+
+  setCameraSolo(): void {
+    this.charCamera.near = 0.1;
+    this.charCamera.far = 100;
+    this.charCamera.position.set(0, 1.0, 3.5);
+    this.charCamera.lookAt(0, 0.8, 0);
+    this.charCamera.fov = 35;
+    this.charCamera.updateProjectionMatrix();
+  }
+
   setCameraDual(): void {
+    this.charCamera.near = 0.1;
+    this.charCamera.far = 100;
     this.charCamera.position.set(0, 0.9, 5.5);
     this.charCamera.lookAt(0, 0.7, 0);
     this.charCamera.fov = 35;

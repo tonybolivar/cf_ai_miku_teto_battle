@@ -99,13 +99,18 @@ export class GameLoop {
       }
     });
 
-    // Initialize bot if in bot mode
-    if (this.config.mode !== "pvp" && this.config.botDifficulty) {
+    // Initialize bot if in bot mode (skip for solo songs -- no opponent to fight)
+    const songAssets = this.config.songId ? SONG_ASSETS[this.config.songId] : undefined;
+    const isSolo = !!songAssets?.soloCharacter;
+    if (!isSolo && this.config.mode !== "pvp" && this.config.botDifficulty) {
       this.bot = new BotPlayer(this.config.botDifficulty);
       this.bot.loadChart(this.chart.notes);
     }
 
-    // Set up game over callback
+    // Disable KO for bot mode -- game ends when chart finishes, not health
+    if (this.config.mode !== "pvp") {
+      this.state.disableKO = true;
+    }
     this.state.on("gameover", (data) => {
       this.config.onGameOver?.(data.winner);
     });
@@ -127,24 +132,47 @@ export class GameLoop {
 
       // Check if song uses MMD models (PMX + VMD, native, no retargeting)
       if (songAssets?.mmdModels) {
+        const isSolo = !!songAssets.soloCharacter;
+        const hasCamera = !!songAssets.mmdCamera;
+        // Use native MMD scale when camera VMD is present (camera expects MMD coords)
+        const nativeScale = hasCamera;
+
         const playerMMD = songAssets.mmdModels[this.config.playerCharacter];
-        const opponentMMD = songAssets.mmdModels[this.config.opponentCharacter];
+        const opponentMMD = isSolo ? undefined : songAssets.mmdModels[this.config.opponentCharacter];
 
         const mmdLoads: Promise<void>[] = [];
         if (playerMMD) {
-          mmdLoads.push(this.vrm.loadMMDCharacter(
-            "player", playerMMD.pmx, playerMMD.vmd,
-            new THREE.Vector3(0.25, 0, 0),
-          ));
+          const pos = nativeScale
+            ? new THREE.Vector3(0, 0, 0) // camera VMD handles framing
+            : new THREE.Vector3(isSolo ? 0 : 0.25, 0, 0);
+          mmdLoads.push(this.vrm.loadMMDCharacter("player", playerMMD.pmx, playerMMD.vmd, pos, nativeScale));
         }
         if (opponentMMD) {
-          mmdLoads.push(this.vrm.loadMMDCharacter(
-            "opponent", opponentMMD.pmx, opponentMMD.vmd,
-            new THREE.Vector3(-0.25, 0, 0),
-          ));
+          const pos = nativeScale
+            ? new THREE.Vector3(5, 0, 0) // offset in MMD units (~40cm)
+            : new THREE.Vector3(-0.25, 0, 0);
+          mmdLoads.push(this.vrm.loadMMDCharacter("opponent", opponentMMD.pmx, opponentMMD.vmd, pos, nativeScale));
         }
+
+        // Load MMD stage if specified
+        if (songAssets.mmdStage) {
+          mmdLoads.push(this.vrm.loadMMDStage(songAssets.mmdStage, nativeScale));
+        }
+
+        // Load camera VMD if specified
+        if (songAssets.mmdCamera) {
+          mmdLoads.push(this.vrm.loadMMDCamera(songAssets.mmdCamera));
+        }
+
         await Promise.all(mmdLoads);
-        this.vrm.setCameraDual();
+        if (nativeScale) {
+          // Native MMD scale: character ~20 units tall
+          this.vrm.setCameraMMD();
+        } else if (isSolo) {
+          this.vrm.setCameraSolo();
+        } else {
+          this.vrm.setCameraDual();
+        }
       } else {
         // Load VRM characters (default)
         const vrmLoads: Promise<void>[] = [];
@@ -262,12 +290,12 @@ export class GameLoop {
       this.vrm.render();
     }
 
-    // Check song end
+    // Check song end -- finish when all player notes are done
     if (
       this.songStarted &&
       !this.state.finished &&
-      !this.audio.playing &&
-      songTime > 1000
+      songTime > 5000 &&
+      this.playerNotes.isComplete(songTime)
     ) {
       this.state.finishByTime();
     }

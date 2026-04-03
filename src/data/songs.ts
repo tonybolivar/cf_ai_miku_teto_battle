@@ -6,6 +6,8 @@ export interface SongMeta {
   color: string;
   difficulty: string;
   difficultyColor: string;
+  requiresCharacter?: string; // only available when playing this character
+  modes?: ("bot" | "pvp")[]; // which modes this song is available in (default: both)
 }
 
 export const SONG_LIST: SongMeta[] = [
@@ -17,6 +19,8 @@ export const SONG_LIST: SongMeta[] = [
     color: "#39C5BB",
     difficulty: "EASY",
     difficultyColor: "#12FA05",
+    requiresCharacter: "miku",
+    modes: ["bot"],
   },
   {
     id: "mesmerizer",
@@ -32,13 +36,26 @@ export const SONG_LIST: SongMeta[] = [
 /** Per-song asset configuration */
 export interface SongAssets {
   vrmUrls?: Record<string, string>;
-  /** MMD mode: PMX model + VMD animation (native MMD, no retargeting) */
   mmdModels?: Record<string, { pmx: string; vmd: string[] }>;
+  mmdStage?: string;
+  mmdCamera?: string; // VMD camera animation
   backgroundVideo?: string;
   noStage?: boolean;
+  soloCharacter?: string; // only load this character (e.g. "miku")
 }
 
 export const SONG_ASSETS: Record<string, SongAssets> = {
+  po_pi_po: {
+    mmdModels: {
+      miku: {
+        pmx: "/assets/mmd/miku/mikitm001.pmx",
+        vmd: ["/assets/vmd/miku_popipo.vmd"],
+      },
+    },
+    mmdStage: "/assets/mmd/popipo_stage/Stage.pmx",
+    noStage: true,
+    soloCharacter: "miku",
+  },
   mesmerizer: {
     mmdModels: {
       miku: {

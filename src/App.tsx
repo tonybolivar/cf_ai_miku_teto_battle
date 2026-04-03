@@ -4,7 +4,7 @@ import CharacterSelect from "./screens/CharacterSelect";
 import ModeSelect from "./screens/ModeSelect";
 import SongSelect from "./screens/SongSelect";
 import LobbyScreen from "./screens/LobbyScreen";
-import TrashTalkScreen from "./screens/TrashTalkScreen";
+import CatFaceScreen from "./screens/CatFaceScreen";
 import CountdownScreen from "./screens/CountdownScreen";
 import GameScreen from "./screens/GameScreen";
 import ResultsScreen from "./screens/ResultsScreen";
@@ -20,7 +20,7 @@ type Screen =
   | "modeSelect"
   | "songSelect"
   | "lobby"
-  | "trashTalk"
+  | "catFace"
   | "countdown"
   | "game"
   | "results"
@@ -98,11 +98,7 @@ export default function App() {
     setConfig((c) => ({ ...c, songId }));
     const loadedChart = await loadChart(songId);
     setChart(loadedChart);
-    setScreen("trashTalk");
-  }, []);
-
-  const handleTrashTalkDone = useCallback(() => {
-    setScreen("game"); // GameScreen has its own countdown after loading
+    setScreen("catFace");
   }, []);
 
   const handleGameOver = useCallback((
@@ -127,7 +123,7 @@ export default function App() {
       return <ModeSelect onSelect={handleModeSelect} />;
 
     case "songSelect":
-      return <SongSelect onSelect={handleSongSelect} />;
+      return <SongSelect playerCharacter={config.character} mode={config.mode} onSelect={handleSongSelect} />;
 
     case "lobby":
       return (
@@ -136,20 +132,13 @@ export default function App() {
           songId={config.songId}
           mode={config.mode}
           botDifficulty={config.botDifficulty ?? undefined}
-          onGameStart={() => setScreen("trashTalk")}
+          onGameStart={() => setScreen("catFace")}
           onCancel={() => setScreen("modeSelect")}
         />
       );
 
-    case "trashTalk":
-      return (
-        <TrashTalkScreen
-          opponentCharacter={config.opponentCharacter}
-          playerCharacter={config.character}
-          songTitle={SONG_LIST.find((s) => s.id === config.songId)?.title || config.songId}
-          onDone={handleTrashTalkDone}
-        />
-      );
+    case "catFace":
+      return <CatFaceScreen onDone={() => setScreen("game")} />;
 
     case "game": {
       // Default VRMs, overridden by song-specific assets
@@ -187,7 +176,7 @@ export default function App() {
           opponentScore={result?.opponentScore ?? 0}
           playerCombo={result?.playerCombo ?? 0}
           playerMisses={result?.playerMisses ?? 0}
-          onPlayAgain={() => setScreen("countdown")}
+          onPlayAgain={() => setScreen("game")}
           onLeaderboard={() => setScreen("leaderboard")}
           onTitle={() => setScreen("title")}
         />

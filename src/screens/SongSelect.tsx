@@ -1,12 +1,21 @@
 import { useState } from "react";
-import { SONG_LIST, type SongMeta } from "../data/songs";
+import { SONG_LIST } from "../data/songs";
+import type { Character, GameMode } from "../types/game";
 
 interface SongSelectProps {
+  playerCharacter: Character;
+  mode: GameMode;
   onSelect: (songId: string) => void;
 }
 
-export default function SongSelect({ onSelect }: SongSelectProps) {
+export default function SongSelect({ playerCharacter, mode, onSelect }: SongSelectProps) {
   const [hovered, setHovered] = useState<string | null>(null);
+
+  const available = SONG_LIST.filter((song) => {
+    if (song.requiresCharacter && song.requiresCharacter !== playerCharacter) return false;
+    if (song.modes && !song.modes.includes(mode)) return false;
+    return true;
+  });
 
   return (
     <div style={{
@@ -19,7 +28,7 @@ export default function SongSelect({ onSelect }: SongSelectProps) {
       </h2>
 
       <div style={{ display: "flex", gap: 24, flexWrap: "wrap", justifyContent: "center", maxWidth: 800 }}>
-        {SONG_LIST.map((song) => (
+        {available.map((song) => (
           <button
             key={song.id}
             onClick={() => onSelect(song.id)}

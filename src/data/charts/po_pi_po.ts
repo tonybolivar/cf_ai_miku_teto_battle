@@ -6,11 +6,10 @@ function generate(): Chart {
   const bpm = 138;
   const beatMs = 60000 / bpm;
 
-  // Po Pi Po is a bouncy, easy song — mostly quarter notes with simple patterns
   const playerPatterns: Lane[][] = [
-    [2, 1, 2, 1],           // verse: up-down bounce
-    [0, 2, 3, 1],           // pre-chorus: all lanes
-    [2, 2, 1, 1, 2, 2, 3, 3], // chorus: doubles
+    [2, 1, 2, 1],
+    [0, 2, 3, 1],
+    [2, 2, 1, 1, 2, 2, 3, 3],
   ];
   const oppPatterns: Lane[][] = [
     [1, 2],
@@ -18,21 +17,24 @@ function generate(): Chart {
     [2, 1, 3, 0],
   ];
 
-  const startTime = 2000;
+  const startTime = 4000;
   let section = 0;
 
-  for (let beat = 0; beat < 200; beat++) {
+  for (let beat = 0; beat < 470; beat++) {
     const time = startTime + beat * beatMs;
-
-    // Switch section every ~48 beats
-    if (beat === 48) section = 1;
-    if (beat === 96) section = 2;
-    if (beat === 144) section = 1;
+    if (beat < 48) section = 0;
+    else if (beat < 96) section = 1;
+    else if (beat < 144) section = 2;
+    else if (beat < 192) section = 1;
+    else if (beat < 240) section = 0;
+    else if (beat < 288) section = 1;
+    else if (beat < 336) section = 2;
+    else if (beat < 384) section = 1;
+    else section = 2;
 
     const pp = playerPatterns[section];
     const op = oppPatterns[section];
 
-    // Player note every beat
     notes.push({
       noteId: `p${id++}`,
       time: Math.round(time),
@@ -41,7 +43,6 @@ function generate(): Chart {
       isOpponent: false,
     });
 
-    // Opponent every 2nd beat
     if (beat % 2 === 0) {
       notes.push({
         noteId: `o${id++}`,
@@ -52,7 +53,6 @@ function generate(): Chart {
       });
     }
 
-    // Hold notes in chorus sections
     if (section === 2 && beat % 16 === 8) {
       notes.push({
         noteId: `h${id++}`,
@@ -73,15 +73,59 @@ function generate(): Chart {
     chartOffset: 0,
     notes,
     lyrics: [
-      { text: "ぽっぴっぽー", translation: "Po-pi-po!", time: 3000, duration: 2000 },
-      { text: "ぽっぴっぽー", translation: "Po-pi-po!", time: 6000, duration: 2000 },
-      { text: "野菜ジュースを飲もう", translation: "Let's drink vegetable juice", time: 10000, duration: 3000 },
-      { text: "ぽっぴっぽっぽっぽー", translation: "Po-pi-po-ppo-po!", time: 15000, duration: 2500 },
-      { text: "お気に入りはどれかな", translation: "Which one is your favorite?", time: 25000, duration: 3000 },
-      { text: "ぽっぴっぽー", translation: "Po-pi-po!", time: 35000, duration: 2000 },
-      { text: "健康のために", translation: "For your health", time: 45000, duration: 2500 },
-      { text: "野菜生活始めよう", translation: "Let's start a veggie life", time: 55000, duration: 3000 },
-      { text: "ぽっぴっぽっぽっぽっぽー", translation: "Po-pi-po-ppo-ppo-po!", time: 65000, duration: 3000 },
+      // Intro - Po Pi Po chant
+      { text: "ぽっぴっぽー！", translation: "Po Pi Po!", time: 545, duration: 3740 },
+      { text: "ぽっぴっぽっぽっぴっぽー", translation: "Po Pi Po!", time: 4285, duration: 3090 },
+      { text: "ぽっぴっぽー！", translation: "Po Pi Po!", time: 7375, duration: 3410 },
+      { text: "ぽっぴっぽっぽっぴっ ぽぴ", translation: "Po Pi Po Po Pi!", time: 10785, duration: 5370 },
+      // Verse 1
+      { text: "さあ飲め お前好きだろ？野菜ジュース", translation: "Come on, drink! You like it, right? Vegetable juice!", time: 32375, duration: 2465 },
+      { text: "私が決めた いま決めた", translation: "I've decided. I've decided just now.", time: 35895, duration: 2990 },
+      { text: "だから飲んで 私の野菜ジュース", translation: "So drink up! My vegetable juice!", time: 39675, duration: 2500 },
+      { text: "価格は200円", translation: "Costs 200 yen!", time: 42175, duration: 6000 },
+      // Soiya
+      { text: "そいや！！ そいや！！", translation: "Soiya! Soiya!", time: 48985, duration: 2870 },
+      { text: "どっせー！！ どっせー！！", translation: "Dossee! Dossee!", time: 51855, duration: 4500 },
+      { text: "そいや！！ そいや！！", translation: "Soiya! Soiya!", time: 55355, duration: 1000 },
+      { text: "どっせー！！ どっせー！！", translation: "Dossee! Dossee!", time: 56355, duration: 2000 },
+      // Verse 2
+      { text: "まろやか野菜ジュース", translation: "Mild-taste vegetable juice", time: 58355, duration: 1620 },
+      { text: "ふわふわ野菜ジュース", translation: "Creamy, creamy vegetable juice", time: 61085, duration: 3160 },
+      { text: "いちばんオススメなのは", translation: "The one that's the best for you is...", time: 65245, duration: 3570 },
+      { text: "緑のジュース", translation: "The green juice!", time: 68815, duration: 3520 },
+      // Chorus
+      { text: "ぽっぴぽっぴぽっぽっぴっぽー", translation: "Po Pi Po!", time: 72335, duration: 2000 },
+      { text: "ベジタブルな", translation: "Vegetables!", time: 74335, duration: 4000 },
+      { text: "ぽっぴぽっぴぽっぽっぴっぽー", translation: "Po Pi Po!", time: 78335, duration: 2000 },
+      { text: "生命あふれた", translation: "Bursting with life!", time: 80335, duration: 4000 },
+      { text: "ぽっぴぽっぴぽっぽっぴっぽー", translation: "Po Pi Po!", time: 84335, duration: 2000 },
+      { text: "あなたも今", translation: "Now you are too!", time: 86335, duration: 4000 },
+      { text: "ぽっぴぽっぴぽっぽっぴっぽー", translation: "Po Pi Po!", time: 90335, duration: 2000 },
+      { text: "野菜ジュースが好きになる", translation: "Come to love vegetable juice!", time: 92335, duration: 4000 },
+      // Verse 3 (repeat)
+      { text: "さあ飲め お前好きだろ？野菜ジュース", translation: "Come on, drink! You like it, right?", time: 112675, duration: 3880 },
+      { text: "私が決めた いま決めた", translation: "I've decided. I've decided just now.", time: 116555, duration: 3000 },
+      { text: "だから飲んで 私の野菜ジュース", translation: "So drink up! My vegetable juice!", time: 119555, duration: 2310 },
+      { text: "価格は200円", translation: "Costs just 200 yen!", time: 121865, duration: 4340 },
+      // Soiya 2
+      { text: "そいや！！ そいや！！", translation: "Soiya! Soiya!", time: 126520, duration: 2500 },
+      { text: "どっせー！！ どっせー！！", translation: "Dossee! Dossee!", time: 128520, duration: 4480 },
+      { text: "そいや！！ そいや！！", translation: "Come on! Come on!", time: 133000, duration: 3040 },
+      { text: "どっせー！！ どっせー！！", translation: "Let's dance!", time: 136040, duration: 1960 },
+      // Verse 4
+      { text: "まろやか野菜ジュース", translation: "Mellow vegetable juice", time: 137000, duration: 2000 },
+      { text: "ふわふわ野菜ジュース", translation: "Creamy vegetable juice", time: 140295, duration: 3100 },
+      { text: "いちばんオススメなのは", translation: "I guess you should like the best...", time: 143395, duration: 3350 },
+      { text: "緑のジュース！", translation: "Big pale blue juice!", time: 146745, duration: 4000 },
+      // Final chorus
+      { text: "ぽっぴぽっぴぽっぽっぴっぽー", translation: "Po Pi Po!", time: 150745, duration: 2000 },
+      { text: "ベジタブルな", translation: "We are vegetarian!", time: 152745, duration: 4000 },
+      { text: "ぽっぴぽっぴぽっぽっぴっぽー", translation: "Po Pi Po!", time: 156745, duration: 2000 },
+      { text: "生命あふれた", translation: "Every vegetarian!", time: 158745, duration: 6830 },
+      { text: "ぽっぴぽっぴぽっぽっぴっぽー", translation: "Po Pi Po!", time: 165575, duration: 2000 },
+      { text: "野菜ジュースが好きになる", translation: "Happy vegetarian!", time: 167575, duration: 5690 },
+      // YASAI ending
+      { text: "Y・A・S・A・I", translation: "Y.A.S.A.I love you!", time: 173265, duration: 7090 },
     ],
   };
 }
