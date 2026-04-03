@@ -151,6 +151,38 @@ export class NoteEngine {
     return null;
   }
 
+  /** Auto-consume notes that fall within an active hold's duration */
+  consumeHeldNotes(songTime: number): JudgeOutput[] {
+    const consumed: JudgeOutput[] = [];
+
+    for (const hold of this.notes) {
+      if (!hold.holdActive) continue;
+      const holdEnd = hold.time + hold.duration;
+
+      for (const note of this.notes) {
+        if (note === hold || note.judged || note.isOpponent) continue;
+        if (note.lane !== hold.lane) continue;
+        // Note falls within the hold's time span and we've reached it
+        if (note.time > hold.time && note.time <= holdEnd && songTime >= note.time) {
+          note.judged = true;
+          // If the consumed note is itself a hold, extend the current hold
+          if (note.duration > 0) {
+            hold.duration = (note.time - hold.time) + note.duration;
+          }
+          consumed.push({
+            noteId: note.noteId,
+            result: "sick",
+            points: 350,
+            healthDelta: 0.023,
+            lane: note.lane,
+          });
+        }
+      }
+    }
+
+    return consumed;
+  }
+
   /** Get active hold notes for rendering hold tails */
   getActiveHolds(): TrackedNote[] {
     return this.notes.filter((n) => n.holdActive);

@@ -19,6 +19,9 @@ export default function TitleScreen({ onSingleplayer, onMultiplayer }: TitleScre
 
       {/* Content pinned to bottom */}
       <div style={{ position: "relative", zIndex: 1, textAlign: "center", paddingBottom: 60 }}>
+        {/* GIF */}
+        <img src="/assets/title_gif.gif" alt="" style={{ width: 120, marginBottom: 16 }} />
+
         {/* Character labels */}
         <div style={{ display: "flex", justifyContent: "center", gap: 40, marginBottom: 12 }}>
           <span style={{ color: "#39C5BB", fontSize: "1.6rem", fontWeight: 700, letterSpacing: 4, textShadow: "0 0 12px #39C5BB88, 0 2px 8px rgba(0,0,0,0.9)" }}>MIKU</span>

@@ -256,6 +256,13 @@ export class GameLoop {
       this.pvpSend({ type: "miss", noteId: miss.noteId, lane: miss.lane });
     }
 
+    // Auto-consume notes inside active holds (slide notes)
+    const held = this.playerNotes.consumeHeldNotes(songTime);
+    for (const h of held) {
+      this.state.applyPlayerHit(h.result, h.points, h.healthDelta);
+      this.pvpSend({ type: "hit", noteId: h.noteId, rating: h.result as any, lane: h.lane });
+    }
+
     // Process bot actions
     if (this.bot) {
       const botActions = this.bot.getActions(songTime);
