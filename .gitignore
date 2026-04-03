@@ -5,3 +5,4 @@ dist/
 *.local
 .mf/
 .env
+public/assets/mesmerizer_dance.fbx
