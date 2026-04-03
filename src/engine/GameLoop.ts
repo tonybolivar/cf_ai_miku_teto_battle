@@ -329,6 +329,12 @@ export class GameLoop {
     const result = this.playerNotes.judgeInput(lane, songTime);
 
     if (result) {
+      // Remove the buffer entry — we handled this input immediately
+      const buf = this.input.getBuffer();
+      for (let i = buf.length - 1; i >= 0; i--) {
+        if (buf[i].lane === lane) { buf.splice(i, 1); break; }
+      }
+
       this.state.applyPlayerHit(result.result, result.points, result.healthDelta);
 
       if (result.result !== "miss") {
