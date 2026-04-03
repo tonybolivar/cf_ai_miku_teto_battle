@@ -24,6 +24,7 @@ import {
   type Character,
   type BotDifficulty,
 } from "../types/game";
+import type { ServerMessage } from "../types/protocol";
 
 export interface GameLoopConfig {
   noteCanvas: HTMLCanvasElement;
@@ -41,6 +42,10 @@ export interface GameLoopConfig {
   playerStageUrl?: string;
   opponentStageUrl?: string;
   songId?: string;
+  pvpWs?: WebSocket;
+  pvpSlot?: "p1" | "p2";
+  pvpClockOffset?: number;
+  pvpStartAt?: number;
   onGameOver?: (winner: "player" | "opponent" | "draw") => void;
   onStateChange?: (state: GameState) => void;
 }
@@ -55,6 +60,7 @@ export class GameLoop {
   readonly renderer: Renderer;
   vrm: VRMManager | null = null;
   private bot: BotPlayer | null = null;
+  private pvpWs: WebSocket | null = null;
 
   private chart: Chart;
   private config: GameLoopConfig;
@@ -105,6 +111,11 @@ export class GameLoop {
     if (!isSolo && this.config.mode !== "pvp" && this.config.botDifficulty) {
       this.bot = new BotPlayer(this.config.botDifficulty);
       this.bot.loadChart(this.chart.notes);
+    }
+
+    // Attach PVP WebSocket if in pvp mode (reuse connection from lobby)
+    if (this.config.mode === "pvp" && this.config.pvpWs) {
+      this.attachPvpWebSocket(this.config.pvpWs);
     }
 
     // Disable KO for bot mode -- game ends when chart finishes, not health
@@ -221,6 +232,8 @@ export class GameLoop {
     this.audio.close();
     this.input.detach();
     this.vrm?.dispose();
+    // Don't close pvpWs — it's reused for post-game chat. App.tsx owns the lifecycle.
+    this.pvpWs = null;
   }
 
   private loop = (now: number): void => {
@@ -237,6 +250,7 @@ export class GameLoop {
       this.state.applyPlayerHit("miss", 0, miss.healthDelta);
       this.effects.showRating("miss", this.getPlayerCenterX(), this.getPopupY());
       this.effects.shake();
+      this.pvpSend({ type: "miss", noteId: miss.noteId, lane: miss.lane });
     }
 
     // Process bot actions
@@ -323,10 +337,16 @@ export class GameLoop {
 
         // Trigger player character sing animation
         this.vrm?.triggerSing("player", lane);
+
+        // Send hit to server in PVP mode
+        this.pvpSend({ type: "hit", noteId: result.noteId, rating: result.result as any, lane });
       } else {
         soundFX.playMiss();
         this.effects.showRating("miss", this.getPlayerCenterX(), this.getPopupY());
         this.effects.shake();
+
+        // Send miss to server in PVP mode
+        this.pvpSend({ type: "miss", noteId: result.noteId, lane });
       }
     }
   }
@@ -336,6 +356,7 @@ export class GameLoop {
     const result = this.playerNotes.releaseHold(lane, songTime);
     if (result) {
       this.state.applyPlayerHit(result.result, result.points, result.healthDelta);
+      this.pvpSend({ type: "hold_end", noteId: result.noteId, completed: true });
     }
   }
 
@@ -389,5 +410,64 @@ export class GameLoop {
   /** Trigger opponent character sing (called from WebSocket or bot) */
   triggerOpponentSing(lane: Lane): void {
     this.vrm?.triggerSing("opponent", lane);
+  }
+
+  // ── PVP WebSocket ──
+
+  private attachPvpWebSocket(ws: WebSocket): void {
+    this.pvpWs = ws;
+
+    // Replace lobby message handlers with game handlers
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data) as ServerMessage;
+        this.handlePvpMessage(msg);
+      } catch { /* ignore non-JSON */ }
+    };
+
+    ws.onclose = () => {
+      // If game is still running, opponent disconnected
+      if (this.running && !this.state.finished) {
+        this.state.finished = true;
+        this.state.winner = "player";
+        this.config.onGameOver?.("player");
+      }
+    };
+  }
+
+  private handlePvpMessage(msg: ServerMessage): void {
+    switch (msg.type) {
+      case "opponent_update":
+        // Server tells us what the opponent did — update opponent state display
+        this.state.opponentScore = msg.score;
+        this.state.opponentCombo = msg.combo;
+        break;
+
+      case "your_health":
+        // Server is authoritative for health in PVP
+        this.state.health = msg.health;
+        break;
+
+      case "opponent_sing":
+        this.vrm?.triggerSing("opponent", msg.lane);
+        break;
+
+      case "finish": {
+        if (this.state.finished) break;
+        this.state.finished = true;
+        const mySlot = this.config.pvpSlot ?? "p1";
+        const winner = msg.winner === "draw" ? "draw"
+          : msg.winner === mySlot ? "player" : "opponent";
+        this.state.winner = winner;
+        this.config.onGameOver?.(winner);
+        break;
+      }
+    }
+  }
+
+  private pvpSend(msg: object): void {
+    if (this.pvpWs?.readyState === WebSocket.OPEN) {
+      this.pvpWs.send(JSON.stringify(msg));
+    }
   }
 }

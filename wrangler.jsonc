@@ -21,7 +21,7 @@
     "LEADERBOARD_SECRET": "dev-secret-change-in-production"
   },
   "migrations": [
-    { "tag": "v1", "new_classes": ["LobbyDO"] }
+    { "tag": "v1", "new_sqlite_classes": ["LobbyDO"] }
   ],
   "observability": {
     "enabled": true

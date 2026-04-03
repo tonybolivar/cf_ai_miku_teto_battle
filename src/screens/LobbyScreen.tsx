@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
-import { useWebSocket } from "../hooks/useWebSocket";
-import type { Character } from "../types/game";
+import { useState, useEffect, useRef } from "react";
+import { estimateClockOffset } from "../utils/clockSync";
+import PvpChat from "../components/PvpChat";
+import type { Character, GameMode } from "../types/game";
 
 interface LobbyScreenProps {
   playerCharacter: Character;
   songId: string;
-  mode: "pvp" | "bot";
+  mode: GameMode;
   botDifficulty?: string;
-  onGameStart: (wsUrl: string) => void;
+  onGameStart: (ws: WebSocket, slot: "p1" | "p2", clockOffset: number, startAt: number) => void;
   onCancel: () => void;
 }
 
@@ -22,24 +23,50 @@ export default function LobbyScreen({
   const [lobbyCode, setLobbyCode] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState("");
   const [subscreen, setSubscreen] = useState<"choose" | "create" | "join">("choose");
-  const [wsUrl, setWsUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [opponentConnected, setOpponentConnected] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [opponentReady, setOpponentReady] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const clockOffsetRef = useRef(0);
+  const slotRef = useRef<"p1" | "p2">("p1");
+  const gameStartedRef = useRef(false);
 
-  const { connected, lastMessage, send } = useWebSocket(wsUrl);
+  const connectWs = (wsUrl: string, slot: "p1" | "p2") => {
+    slotRef.current = slot;
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const fullUrl = `${protocol}//${window.location.host}${wsUrl}`;
+    const ws = new WebSocket(fullUrl);
+    wsRef.current = ws;
 
-  // Listen for game start message
+    ws.onopen = async () => {
+      setConnected(true);
+      try {
+        clockOffsetRef.current = await estimateClockOffset(ws);
+      } catch { /* ignore */ }
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "opponent_joined") setOpponentConnected(true);
+        if (msg.type === "opponent_ready") setOpponentReady(true);
+        if (msg.type === "start" && wsRef.current) {
+          gameStartedRef.current = true;
+          onGameStart(wsRef.current, slotRef.current, clockOffsetRef.current, msg.startAt);
+          // Clear ref so cleanup doesn't close the handed-off WS
+          wsRef.current = null;
+        }
+      } catch { /* ignore */ }
+    };
+
+    ws.onclose = () => setConnected(false);
+  };
+
   useEffect(() => {
-    if (lastMessage?.type === "start") {
-      onGameStart(wsUrl!);
-    }
-  }, [lastMessage, wsUrl, onGameStart]);
-
-  // Send ready when connected
-  useEffect(() => {
-    if (connected) {
-      send({ type: "ready" });
-    }
-  }, [connected, send]);
+    return () => { wsRef.current?.close(); };
+  }, []);
 
   const handleCreate = async () => {
     try {
@@ -50,9 +77,9 @@ export default function LobbyScreen({
       });
       const data = (await resp.json()) as { lobbyCode: string; wsUrl: string };
       setLobbyCode(data.lobbyCode);
-      setWsUrl(data.wsUrl);
       setSubscreen("create");
-    } catch (e) {
+      connectWs(data.wsUrl, "p1");
+    } catch {
       setError("Failed to create lobby");
     }
   };
@@ -65,17 +92,25 @@ export default function LobbyScreen({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ character: playerCharacter }),
       });
-      if (!resp.ok) {
-        setError("Lobby not found or full");
-        return;
-      }
+      if (!resp.ok) { setError("Lobby not found or full"); return; }
       const data = (await resp.json()) as { wsUrl: string };
-      setWsUrl(data.wsUrl);
       setSubscreen("join");
+      setOpponentConnected(true);
+      connectWs(data.wsUrl, "p2");
     } catch {
       setError("Failed to join lobby");
     }
   };
+
+  const handleReady = () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "ready" }));
+      setReady(true);
+    }
+  };
+
+  const bothConnected = connected && opponentConnected;
+  const waitingForOpponent = connected && !opponentConnected;
 
   return (
     <div style={{
@@ -95,30 +130,59 @@ export default function LobbyScreen({
         </>
       )}
 
-      {subscreen === "create" && (
+      {(subscreen === "create" || (subscreen === "join" && connected)) && (
         <>
           <h2 style={{ color: "#FFF", fontSize: "1.8rem", marginBottom: 20, letterSpacing: 3 }}>
-            WAITING FOR OPPONENT
+            {bothConnected ? "BOTH CONNECTED" : "WAITING FOR OPPONENT"}
           </h2>
-          <p style={{ color: "#888", fontSize: "0.9rem", marginBottom: 30 }}>
-            Share this code:
-          </p>
-          <div style={{
-            fontSize: "3rem", letterSpacing: 12, color: "#00FFFF",
-            padding: "20px 40px", border: "3px solid #00FFFF33", borderRadius: 8,
-          }}>
-            {lobbyCode || "------"}
-          </div>
-          {connected && (
-            <p style={{ color: "#12FA05", marginTop: 20, fontSize: "0.8rem" }}>Connected</p>
+
+          {lobbyCode && (
+            <>
+              <p style={{ color: "#888", fontSize: "0.9rem", marginBottom: 15 }}>Share this code:</p>
+              <div style={{
+                fontSize: "3rem", letterSpacing: 12, color: "#00FFFF",
+                padding: "15px 35px", border: "3px solid #00FFFF33", borderRadius: 8,
+                marginBottom: 30, userSelect: "all",
+              }}>
+                {lobbyCode}
+              </div>
+            </>
           )}
-          <p style={{ color: "#555", marginTop: 20, animation: "blink 1.5s step-end infinite" }}>
-            Waiting for player 2...
-          </p>
+
+          <div style={{ display: "flex", gap: 40, marginBottom: 30 }}>
+            <StatusDot label="You" connected={connected} ready={ready} />
+            <StatusDot label="Opponent" connected={opponentConnected} ready={opponentReady} />
+          </div>
+
+          {bothConnected && !ready && (
+            <button
+              onClick={handleReady}
+              style={{
+                padding: "16px 48px", fontSize: "1.4rem",
+                background: "#12FA05", border: "none", borderRadius: 8,
+                color: "#000", cursor: "pointer", fontWeight: "bold",
+                fontFamily: '"Noto Sans JP", sans-serif',
+              }}
+            >
+              READY!
+            </button>
+          )}
+
+          {ready && !opponentReady && (
+            <p style={{ color: "#12FA05", fontSize: "1.1rem", animation: "blink 1.5s step-end infinite" }}>
+              Waiting for opponent to ready up...
+            </p>
+          )}
+
+          {waitingForOpponent && (
+            <p style={{ color: "#555", animation: "blink 1.5s step-end infinite" }}>
+              Waiting for player 2...
+            </p>
+          )}
         </>
       )}
 
-      {subscreen === "join" && !wsUrl && (
+      {subscreen === "join" && !connected && (
         <>
           <h2 style={{ color: "#FFF", fontSize: "1.8rem", marginBottom: 30, letterSpacing: 3 }}>
             JOIN LOBBY
@@ -154,19 +218,10 @@ export default function LobbyScreen({
         </>
       )}
 
-      {subscreen === "join" && wsUrl && (
-        <>
-          <h2 style={{ color: "#FFF", fontSize: "1.8rem", letterSpacing: 3 }}>
-            CONNECTED
-          </h2>
-          <p style={{ color: "#12FA05", marginTop: 20 }}>Waiting for host to start...</p>
-        </>
-      )}
-
       {error && <p style={{ color: "#F9393F", marginTop: 20 }}>{error}</p>}
 
       <button
-        onClick={onCancel}
+        onClick={() => { wsRef.current?.close(); onCancel(); }}
         style={{
           marginTop: 50, background: "none", border: "none", color: "#555",
           cursor: "pointer", fontFamily: '"Noto Sans JP", sans-serif', fontSize: "0.9rem",
@@ -176,6 +231,29 @@ export default function LobbyScreen({
       </button>
 
       <style>{`@keyframes blink { 50% { opacity: 0; } }`}</style>
+
+      {connected && (
+        <PvpChat
+          ws={wsRef.current}
+          myCharacter={playerCharacter}
+          opponentCharacter={playerCharacter === "miku" ? "teto" : "miku"}
+        />
+      )}
+    </div>
+  );
+}
+
+function StatusDot({ label, connected, ready }: { label: string; connected: boolean; ready: boolean }) {
+  const color = ready ? "#12FA05" : connected ? "#FFB800" : "#555";
+  const status = ready ? "READY" : connected ? "CONNECTED" : "WAITING";
+  return (
+    <div style={{ textAlign: "center" }}>
+      <div style={{
+        width: 16, height: 16, borderRadius: "50%", background: color,
+        margin: "0 auto 8px", boxShadow: connected ? `0 0 10px ${color}` : "none",
+      }} />
+      <div style={{ color: "#FFF", fontSize: "0.9rem" }}>{label}</div>
+      <div style={{ color, fontSize: "0.7rem" }}>{status}</div>
     </div>
   );
 }

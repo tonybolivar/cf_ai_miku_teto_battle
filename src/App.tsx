@@ -78,6 +78,7 @@ export default function App() {
   });
   const [chart, setChart] = useState<Chart>(PO_PI_PO_CHART);
   const [result, setResult] = useState<GameResult | null>(null);
+  const [pvpInfo, setPvpInfo] = useState<{ ws: WebSocket; slot: "p1" | "p2"; clockOffset: number; startAt: number } | null>(null);
 
   const handleCharSelect = useCallback((character: Character) => {
     const opponent: Character = character === "miku" ? "teto" : "miku";
@@ -87,19 +88,19 @@ export default function App() {
 
   const handleModeSelect = useCallback((mode: GameMode, difficulty: BotDifficulty | null) => {
     setConfig((c) => ({ ...c, mode, botDifficulty: difficulty }));
-    if (mode === "pvp") {
-      setScreen("lobby");
-    } else {
-      setScreen("songSelect");
-    }
+    setScreen("songSelect");
   }, []);
 
   const handleSongSelect = useCallback(async (songId: string) => {
     setConfig((c) => ({ ...c, songId }));
     const loadedChart = await loadChart(songId);
     setChart(loadedChart);
-    setScreen("catFace");
-  }, []);
+    if (config.mode === "pvp") {
+      setScreen("lobby");
+    } else {
+      setScreen("catFace");
+    }
+  }, [config.mode]);
 
   const handleGameOver = useCallback((
     winner: "player" | "opponent" | "draw",
@@ -132,8 +133,11 @@ export default function App() {
           songId={config.songId}
           mode={config.mode}
           botDifficulty={config.botDifficulty ?? undefined}
-          onGameStart={() => setScreen("catFace")}
-          onCancel={() => setScreen("modeSelect")}
+          onGameStart={(ws, slot, clockOffset, startAt) => {
+            setPvpInfo({ ws, slot, clockOffset, startAt });
+            setScreen("game");
+          }}
+          onCancel={() => setScreen("songSelect")}
         />
       );
 
@@ -161,12 +165,17 @@ export default function App() {
           opponentVrmUrl={opponentVrm}
           playerStageUrl={songAssets?.noStage ? undefined : "/assets/stage_teto.glb"}
           songId={config.songId}
+          pvpInfo={config.mode === "pvp" ? pvpInfo ?? undefined : undefined}
           onGameOver={handleGameOver}
         />
       );
     }
 
-    case "results":
+    case "results": {
+      const closePvp = () => {
+        pvpInfo?.ws?.close();
+        setPvpInfo(null);
+      };
       return (
         <ResultsScreen
           winner={result?.winner ?? "draw"}
@@ -176,11 +185,13 @@ export default function App() {
           opponentScore={result?.opponentScore ?? 0}
           playerCombo={result?.playerCombo ?? 0}
           playerMisses={result?.playerMisses ?? 0}
-          onPlayAgain={() => setScreen("game")}
-          onLeaderboard={() => setScreen("leaderboard")}
-          onTitle={() => setScreen("title")}
+          pvpWs={pvpInfo?.ws}
+          onPlayAgain={() => { closePvp(); setScreen("game"); }}
+          onLeaderboard={() => { closePvp(); setScreen("leaderboard"); }}
+          onTitle={() => { closePvp(); setScreen("title"); }}
         />
       );
+    }
 
     case "leaderboard":
       return <LeaderboardScreen onBack={() => setScreen(result ? "results" : "title")} />;

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CHARACTER_COLORS, type Character } from "../types/game";
+import PvpChat from "../components/PvpChat";
 
 interface ResultsScreenProps {
   winner: "player" | "opponent" | "draw";
@@ -9,6 +10,7 @@ interface ResultsScreenProps {
   opponentScore: number;
   playerCombo: number;
   playerMisses: number;
+  pvpWs?: WebSocket | null;
   onPlayAgain: () => void;
   onLeaderboard: () => void;
   onTitle: () => void;
@@ -22,6 +24,7 @@ export default function ResultsScreen({
   opponentScore,
   playerCombo,
   playerMisses,
+  pvpWs,
   onPlayAgain,
   onLeaderboard,
   onTitle,
@@ -126,6 +129,14 @@ export default function ResultsScreen({
           100% { transform: scale(1); opacity: 1; }
         }
       `}</style>
+
+      {pvpWs && (
+        <PvpChat
+          ws={pvpWs}
+          myCharacter={playerCharacter}
+          opponentCharacter={opponentCharacter}
+        />
+      )}
     </div>
   );
 }

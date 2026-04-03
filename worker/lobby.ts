@@ -127,6 +127,8 @@ export class LobbyDO implements DurableObject {
       this.state.botDifficulty = url.searchParams.get("botDifficulty") as any || null;
     } else {
       this.state.p2 = playerState;
+      // Notify P1 that opponent joined
+      this.sendTo("p1", { type: "opponent_joined" });
     }
 
     this.saveState();
@@ -171,6 +173,14 @@ export class LobbyDO implements DurableObject {
           this.handleHit(slot, msg.noteId, "sick", 0);
         }
         break;
+
+      case "chat": {
+        const text = String(msg.text ?? "").slice(0, 200);
+        if (!text) break;
+        const otherSlot: PlayerSlot = slot === "p1" ? "p2" : "p1";
+        this.sendTo(otherSlot, { type: "chat", from: slot, text });
+        break;
+      }
     }
   }
 
@@ -199,6 +209,10 @@ export class LobbyDO implements DurableObject {
     const player = slot === "p1" ? this.state.p1 : this.state.p2;
     if (!player) return;
     player.ready = true;
+
+    // Notify the other player
+    const otherSlot = slot === "p1" ? "p2" : "p1";
+    this.sendTo(otherSlot, { type: "opponent_ready" });
 
     // Check if both ready (or solo mode)
     const bothReady = this.state.p1?.ready && (this.state.p2?.ready || this.state.mode === "bot");

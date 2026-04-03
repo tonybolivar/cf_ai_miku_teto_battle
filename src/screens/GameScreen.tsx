@@ -16,6 +16,7 @@ interface GameScreenProps {
   playerStageUrl?: string;
   opponentStageUrl?: string;
   songId?: string;
+  pvpInfo?: { ws: WebSocket; slot: "p1" | "p2"; clockOffset: number; startAt: number };
   onGameOver: (winner: "player" | "opponent" | "draw", playerScore: number, opponentScore: number, maxCombo: number, misses: number) => void;
 }
 
@@ -30,6 +31,7 @@ export default function GameScreen({
   playerStageUrl,
   opponentStageUrl,
   songId,
+  pvpInfo,
   onGameOver,
 }: GameScreenProps) {
   const noteCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -88,6 +90,10 @@ export default function GameScreen({
       playerStageUrl,
       opponentStageUrl,
       songId,
+      pvpWs: pvpInfo?.ws,
+      pvpSlot: pvpInfo?.slot,
+      pvpClockOffset: pvpInfo?.clockOffset,
+      pvpStartAt: pvpInfo?.startAt,
       onGameOver: (winner) => {
         const state = loop.state;
         onGameOver(winner, state.score, state.opponentScore, state.maxCombo, state.misses);
