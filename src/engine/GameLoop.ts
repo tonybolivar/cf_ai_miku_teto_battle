@@ -160,13 +160,13 @@ export class GameLoop {
         if (playerMMD) {
           const pos = nativeScale
             ? new THREE.Vector3(0, 0, 0) // camera VMD handles framing
-            : new THREE.Vector3(isSolo ? 0 : (mikuIsPlayer ? -0.25 : 0.25), 0, 0);
+            : new THREE.Vector3(isSolo ? 0 : (mikuIsPlayer ? -0.12 : 0.12), 0, 0);
           mmdLoads.push(this.vrm.loadMMDCharacter("player", playerMMD.pmx, playerMMD.vmd, pos, nativeScale));
         }
         if (opponentMMD) {
           const pos = nativeScale
             ? new THREE.Vector3(5, 0, 0) // offset in MMD units (~40cm)
-            : new THREE.Vector3(mikuIsPlayer ? 0.25 : -0.25, 0, 0);
+            : new THREE.Vector3(mikuIsPlayer ? 0.12 : -0.12, 0, 0);
           mmdLoads.push(this.vrm.loadMMDCharacter("opponent", opponentMMD.pmx, opponentMMD.vmd, pos, nativeScale));
         }
 

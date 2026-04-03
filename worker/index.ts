@@ -164,13 +164,8 @@ Do not use quotation marks in your response. Write only in Japanese.`;
     }
   }
 
-  // Leaderboard write (internal only)
+  // Leaderboard write
   if (url.pathname === "/api/leaderboard" && request.method === "POST") {
-    const secret = request.headers.get("X-Leaderboard-Secret");
-    if (secret !== env.LEADERBOARD_SECRET) {
-      return Response.json({ error: "unauthorized" }, { status: 403, headers: corsHeaders });
-    }
-
     if (!env.LEADERBOARD) {
       return Response.json({ error: "KV not configured" }, { status: 503, headers: corsHeaders });
     }
