@@ -21,7 +21,6 @@ export class GameState {
   opponentCombo = 0;
 
   // Game phase
-  disableKO = false;
   finished = false;
   winner: "player" | "opponent" | "draw" | null = null;
 
@@ -84,21 +83,9 @@ export class GameState {
   }
 
   private checkGameOver(): void {
-    if (this.finished) return;
-
-    // Player can always lose by KO
-    if (this.health <= 0) {
-      this.health = 0;
-      this.finished = true;
-      this.winner = "opponent";
-      this.emit("gameover", { winner: "opponent" });
-    } else if (this.opponentHealth <= 0 && !this.disableKO) {
-      // AI opponent can't be KO'd in bot mode -- game plays to the end
-      this.opponentHealth = 0;
-      this.finished = true;
-      this.winner = "player";
-      this.emit("gameover", { winner: "player" });
-    }
+    // KO disabled — health is purely visual. Game ends when chart finishes.
+    if (this.health < 0) this.health = 0;
+    if (this.opponentHealth < 0) this.opponentHealth = 0;
   }
 
   finishByTime(): void {

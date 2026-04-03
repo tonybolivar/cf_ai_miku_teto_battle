@@ -195,6 +195,15 @@ export class LobbyDO implements DurableObject {
         break;
       }
 
+      case "game_finished":
+        if (this.state.phase === "playing") {
+          const winner = (this.state.p1?.score ?? 0) >= (this.state.p2?.score ?? 0) ? "p1" : "p2";
+          this.finishMatch(
+            (this.state.p1?.score ?? 0) === (this.state.p2?.score ?? 0) ? "draw" : winner,
+          );
+        }
+        break;
+
       case "rematch":
         this.handleRematch(slot);
         break;

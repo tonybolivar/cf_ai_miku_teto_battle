@@ -10,7 +10,8 @@ export type ClientMessage =
   | { type: "miss"; noteId: string; lane: Lane }
   | { type: "hold_end"; noteId: string; completed: boolean }
   | { type: "chat"; text: string }
-  | { type: "rematch" };
+  | { type: "rematch" }
+  | { type: "game_finished" };
 
 // ── Server → Client ──
 

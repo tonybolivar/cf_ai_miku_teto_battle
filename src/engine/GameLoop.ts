@@ -120,10 +120,6 @@ export class GameLoop {
       this.attachPvpWebSocket(this.config.pvpWs);
     }
 
-    // Disable KO for bot mode -- game ends when chart finishes, not health
-    if (this.config.mode !== "pvp") {
-      this.state.disableKO = true;
-    }
     this.state.on("gameover", (data) => {
       this.config.onGameOver?.(data.winner);
     });
@@ -319,6 +315,7 @@ export class GameLoop {
       this.playerNotes.isComplete(songTime)
     ) {
       this.state.finishByTime();
+      this.pvpSend({ type: "game_finished" });
     }
 
     this.rafId = requestAnimationFrame(this.loop);
