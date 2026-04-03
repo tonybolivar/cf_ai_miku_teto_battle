@@ -69,7 +69,10 @@ export default function LyricsDisplay({ lyrics, getSongTime, chartOffset }: Lyri
         transform: "translate(-50%, -50%)",
         textAlign: "center",
         pointerEvents: "none",
-        zIndex: 3,
+        zIndex: 4,
+        background: "rgba(0,0,0,0.75)",
+        padding: "10px 24px",
+        borderRadius: 10,
         opacity: current.active ? 1 : 0,
         transition: current.active
           ? "opacity 100ms ease-in"
@@ -90,9 +93,9 @@ export default function LyricsDisplay({ lyrics, getSongTime, chartOffset }: Lyri
 
       {/* English translation */}
       <div style={{
-        fontFamily: '"VCR OSD Mono", monospace',
+        fontFamily: '"Noto Sans JP", sans-serif',
         fontSize: "0.9rem",
-        color: "#AAA",
+        color: "#DDD",
         textShadow: "0 0 8px rgba(0,0,0,0.8), 0 2px 4px rgba(0,0,0,0.9)",
         letterSpacing: 1,
       }}>

@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { AudioManager } from "./AudioManager";
 import { InputManager } from "./InputManager";
 import { NoteEngine } from "./NoteEngine";
@@ -8,6 +9,8 @@ import { VRMManager } from "./VRMManager";
 import { StageManager } from "./StageManager";
 import { BotPlayer } from "./BotPlayer";
 import { soundFX } from "./SoundFX";
+import { SONG_ASSETS } from "../data/songs";
+import { loadFBXDance } from "./FBXDanceLoader";
 import {
   LANE_COLORS,
   LANE_WIDTH,
@@ -37,6 +40,7 @@ export interface GameLoopConfig {
   opponentVrmUrl?: string;
   playerStageUrl?: string;
   opponentStageUrl?: string;
+  songId?: string;
   onGameOver?: (winner: "player" | "opponent" | "draw") => void;
   onStateChange?: (state: GameState) => void;
 }
@@ -58,6 +62,7 @@ export class GameLoop {
   private lastFrameTime = 0;
   private running = false;
   private songStarted = false;
+  private destroyed = false;
 
   constructor(config: GameLoopConfig) {
     this.config = config;
@@ -70,7 +75,7 @@ export class GameLoop {
   }
 
   async init(): Promise<void> {
-    // Load audio
+    // Load audio first (critical path - blocks game start)
     await this.audio.init();
     await this.audio.load(this.chart.audioFile);
 
@@ -109,65 +114,83 @@ export class GameLoop {
     if (this.config.vrmCanvas) {
       this.vrm = new VRMManager(this.config.vrmCanvas);
 
-      // Load GLB stages (separate scene layer)
-      if (this.config.playerStageUrl || this.config.opponentStageUrl) {
+      const songId = this.config.songId;
+      const songAssets = songId ? SONG_ASSETS[songId] : undefined;
+
+      // Load GLB stage (unless song has video background)
+      if (this.config.playerStageUrl) {
         const stage = new StageManager();
         this.vrm.setStageManager(stage);
-
-        const stageLoads: Promise<void>[] = [];
-        if (this.config.playerStageUrl) {
-          stageLoads.push(stage.loadStage(this.config.playerCharacter, this.config.playerStageUrl));
-        }
-        if (this.config.opponentStageUrl) {
-          stageLoads.push(stage.loadStage(this.config.opponentCharacter, this.config.opponentStageUrl));
-        }
-        await Promise.all(stageLoads);
-
-        // Show the player's stage initially
+        await stage.loadStage(this.config.playerCharacter, this.config.playerStageUrl);
         stage.showStage(this.config.playerCharacter);
       }
 
-      // Load VRM character models
-      if (this.config.playerVrmUrl) {
-        await this.vrm.loadCharacter(
-          "player",
-          this.config.playerVrmUrl,
-          { x: 0.8, y: 0, z: 0 } as any
-        );
-      }
-      if (this.config.opponentVrmUrl) {
-        await this.vrm.loadCharacter(
-          "opponent",
-          this.config.opponentVrmUrl,
-          { x: -0.8, y: 0, z: 0 } as any
-        );
-      }
+      // Check if song uses MMD models (PMX + VMD, native, no retargeting)
+      if (songAssets?.mmdModels) {
+        const playerMMD = songAssets.mmdModels[this.config.playerCharacter];
+        const opponentMMD = songAssets.mmdModels[this.config.opponentCharacter];
 
-      if (this.config.playerVrmUrl || this.config.opponentVrmUrl) {
+        const mmdLoads: Promise<void>[] = [];
+        if (playerMMD) {
+          mmdLoads.push(this.vrm.loadMMDCharacter(
+            "player", playerMMD.pmx, playerMMD.vmd,
+            new THREE.Vector3(0.25, 0, 0),
+          ));
+        }
+        if (opponentMMD) {
+          mmdLoads.push(this.vrm.loadMMDCharacter(
+            "opponent", opponentMMD.pmx, opponentMMD.vmd,
+            new THREE.Vector3(-0.25, 0, 0),
+          ));
+        }
+        await Promise.all(mmdLoads);
         this.vrm.setCameraDual();
+      } else {
+        // Load VRM characters (default)
+        const vrmLoads: Promise<void>[] = [];
+        if (this.config.playerVrmUrl) {
+          vrmLoads.push(this.vrm.loadCharacter("player", this.config.playerVrmUrl, new THREE.Vector3(0.8, 0, 0)));
+        }
+        if (this.config.opponentVrmUrl) {
+          vrmLoads.push(this.vrm.loadCharacter("opponent", this.config.opponentVrmUrl, new THREE.Vector3(-0.8, 0, 0)));
+        }
+        await Promise.all(vrmLoads);
+
+        if (this.config.playerVrmUrl || this.config.opponentVrmUrl) {
+          this.vrm.setCameraDual();
+        }
       }
     }
   }
 
-  start(): void {
+  async start(): Promise<void> {
+    if (this.destroyed) return;
     this.running = true;
     this.songStarted = false;
     this.lastFrameTime = performance.now();
 
-    // Start audio
-    this.audio.resume().then(() => {
+    // Start audio - must succeed before notes scroll
+    try {
+      await this.audio.resume();
       if (this.audio.context) soundFX.init(this.audio.context);
       this.audio.play(this.config.startAt ?? 0);
       this.songStarted = true;
-    });
+      console.log("[GameLoop] Audio started, songTime:", this.audio.getSongTime());
+    } catch (e) {
+      console.error("[GameLoop] Audio failed to start:", e);
+      // Fallback: use performance timer so notes still scroll
+      this.songStarted = true;
+    }
 
     this.loop(performance.now());
   }
 
   stop(): void {
+    this.destroyed = true;
     this.running = false;
     cancelAnimationFrame(this.rafId);
     this.audio.stop();
+    this.audio.close();
     this.input.detach();
     this.vrm?.dispose();
   }
@@ -311,16 +334,20 @@ export class GameLoop {
     }
   }
 
-  // ── Layout helpers ──
+  // ── Layout helpers (use CSS pixel width, not DPR-scaled canvas.width) ──
+
+  private get canvasWidth(): number {
+    return this.config.noteCanvas.clientWidth || this.config.noteCanvas.width;
+  }
 
   private getPlayerCenterX(): number {
     const edgePadding = 30;
-    return this.config.noteCanvas.width - HIGHWAY_WIDTH - edgePadding + HIGHWAY_WIDTH / 2;
+    return this.canvasWidth - HIGHWAY_WIDTH - edgePadding + HIGHWAY_WIDTH / 2;
   }
 
   private getPlayerLaneX(lane: Lane): number {
     const edgePadding = 30;
-    return this.config.noteCanvas.width - HIGHWAY_WIDTH - edgePadding + lane * LANE_WIDTH + LANE_WIDTH / 2;
+    return this.canvasWidth - HIGHWAY_WIDTH - edgePadding + lane * LANE_WIDTH + LANE_WIDTH / 2;
   }
 
   private getPopupY(): number {

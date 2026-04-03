@@ -81,7 +81,7 @@ export default function LobbyScreen({
     <div style={{
       width: "100%", height: "100%", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#000",
-      fontFamily: '"VCR OSD Mono", monospace',
+      fontFamily: '"Noto Sans JP", sans-serif',
     }}>
       {subscreen === "choose" && (
         <>
@@ -135,7 +135,7 @@ export default function LobbyScreen({
               fontSize: "2rem", letterSpacing: 8, textAlign: "center",
               padding: "16px 32px", background: "#111", border: "2px solid #333",
               borderRadius: 8, color: "#FFF", outline: "none", width: 280,
-              fontFamily: '"VCR OSD Mono", monospace',
+              fontFamily: '"Noto Sans JP", sans-serif',
             }}
           />
           <button
@@ -146,7 +146,7 @@ export default function LobbyScreen({
               background: joinCode.length === 6 ? "#C24B99" : "#333",
               border: "none", borderRadius: 6, color: "#FFF",
               cursor: joinCode.length === 6 ? "pointer" : "default",
-              fontFamily: '"VCR OSD Mono", monospace',
+              fontFamily: '"Noto Sans JP", sans-serif',
             }}
           >
             JOIN
@@ -169,7 +169,7 @@ export default function LobbyScreen({
         onClick={onCancel}
         style={{
           marginTop: 50, background: "none", border: "none", color: "#555",
-          cursor: "pointer", fontFamily: '"VCR OSD Mono", monospace', fontSize: "0.9rem",
+          cursor: "pointer", fontFamily: '"Noto Sans JP", sans-serif', fontSize: "0.9rem",
         }}
       >
         &larr; BACK
@@ -190,7 +190,7 @@ function LobbyButton({ label, desc, color, onClick }: {
         width: 200, padding: "30px 20px", display: "flex", flexDirection: "column",
         alignItems: "center", gap: 12,
         background: "#0a0a0f", border: `2px solid ${color}44`, borderRadius: 8,
-        cursor: "pointer", fontFamily: '"VCR OSD Mono", monospace',
+        cursor: "pointer", fontFamily: '"Noto Sans JP", sans-serif',
       }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = color; }}
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = `${color}44`; }}

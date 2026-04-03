@@ -5,9 +5,9 @@ interface CharacterSelectProps {
   onSelect: (character: Character) => void;
 }
 
-const CHARACTERS: { id: Character; name: string; color: string; desc: string }[] = [
-  { id: "miku", name: "HATSUNE MIKU", color: "#39C5BB", desc: "Virtual diva, 16 years old forever" },
-  { id: "teto", name: "KASANE TETO", color: "#E54451", desc: "Chimera with twin drills, age 31" },
+const CHARACTERS: { id: Character; name: string; color: string; desc: string; portrait: string }[] = [
+  { id: "miku", name: "HATSUNE MIKU", color: "#39C5BB", desc: "Virtual diva, 16 years old forever", portrait: "/assets/portrait_miku.png" },
+  { id: "teto", name: "KASANE TETO", color: "#E54451", desc: "Chimera with twin drills, age 31", portrait: "/assets/portrait_teto.jpg" },
 ];
 
 export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
@@ -17,7 +17,7 @@ export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
     <div style={{
       width: "100%", height: "100%", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#000",
-      fontFamily: '"VCR OSD Mono", monospace',
+      fontFamily: '"Noto Sans JP", sans-serif',
     }}>
       <h2 style={{ color: "#FFF", fontSize: "2rem", marginBottom: 50, letterSpacing: 4 }}>
         CHOOSE YOUR FIGHTER
@@ -31,25 +31,27 @@ export default function CharacterSelect({ onSelect }: CharacterSelectProps) {
             onMouseEnter={() => setHovered(char.id)}
             onMouseLeave={() => setHovered(null)}
             style={{
-              width: 260, height: 360, display: "flex", flexDirection: "column",
+              width: 280, height: 420, display: "flex", flexDirection: "column",
               alignItems: "center", justifyContent: "center",
               background: hovered === char.id ? `${char.color}15` : "#0a0a0f",
               border: `3px solid ${hovered === char.id ? char.color : "#333"}`,
               borderRadius: 12, cursor: "pointer", transition: "all 0.2s",
               transform: hovered === char.id ? "scale(1.05)" : "scale(1)",
-              fontFamily: '"VCR OSD Mono", monospace',
+              fontFamily: '"Noto Sans JP", sans-serif',
             }}
           >
-            {/* Character placeholder */}
-            <div style={{
-              width: 120, height: 160, marginBottom: 20,
-              background: `linear-gradient(135deg, ${char.color}33, ${char.color}11)`,
-              border: `2px solid ${char.color}44`, borderRadius: 8,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "3rem", color: char.color,
-            }}>
-              {char.id === "miku" ? "M" : "T"}
-            </div>
+            {/* Character portrait */}
+            <img
+              src={char.portrait}
+              alt={char.name}
+              style={{
+                width: 200, height: 240, marginBottom: 20,
+                objectFit: "cover", objectPosition: "top",
+                borderRadius: 8,
+                border: `2px solid ${hovered === char.id ? char.color : char.color + "44"}`,
+                transition: "border-color 0.2s",
+              }}
+            />
 
             <span style={{
               color: char.color, fontSize: "1.3rem", letterSpacing: 3, marginBottom: 8,

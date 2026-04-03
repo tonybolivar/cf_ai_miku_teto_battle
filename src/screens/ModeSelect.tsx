@@ -18,7 +18,7 @@ export default function ModeSelect({ onSelect }: ModeSelectProps) {
     <div style={{
       width: "100%", height: "100%", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#000",
-      fontFamily: '"VCR OSD Mono", monospace',
+      fontFamily: '"Noto Sans JP", sans-serif',
     }}>
       <h2 style={{ color: "#FFF", fontSize: "2rem", marginBottom: 50, letterSpacing: 4 }}>
         {mode === null ? "SELECT MODE" : "SELECT DIFFICULTY"}
@@ -58,7 +58,7 @@ export default function ModeSelect({ onSelect }: ModeSelectProps) {
           onClick={() => setMode(null)}
           style={{
             marginTop: 40, background: "none", border: "none", color: "#555",
-            cursor: "pointer", fontFamily: '"VCR OSD Mono", monospace', fontSize: "0.9rem",
+            cursor: "pointer", fontFamily: '"Noto Sans JP", sans-serif', fontSize: "0.9rem",
           }}
         >
           &larr; BACK
@@ -78,7 +78,7 @@ function ModeButton({ label, desc, color, onClick }: {
         width: 200, padding: "30px 20px", display: "flex", flexDirection: "column",
         alignItems: "center", gap: 12,
         background: "#0a0a0f", border: `2px solid ${color}44`, borderRadius: 8,
-        cursor: "pointer", fontFamily: '"VCR OSD Mono", monospace',
+        cursor: "pointer", fontFamily: '"Noto Sans JP", sans-serif',
         transition: "all 0.15s",
       }}
       onMouseEnter={(e) => {

@@ -14,7 +14,8 @@
     "@pixiv/three-vrm": "^3.5.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "three": "^0.183.2"
+    "three": "^0.183.2",
+    "three-stdlib": "^2.36.1"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.0.0",

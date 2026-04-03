@@ -31,7 +31,7 @@ export default function LeaderboardScreen({ onBack }: LeaderboardScreenProps) {
     <div style={{
       width: "100%", height: "100%", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#000",
-      fontFamily: '"VCR OSD Mono", monospace',
+      fontFamily: '"Noto Sans JP", sans-serif',
     }}>
       <h2 style={{ color: "#FFF", fontSize: "2rem", marginBottom: 40, letterSpacing: 4 }}>
         LEADERBOARD
@@ -86,7 +86,7 @@ export default function LeaderboardScreen({ onBack }: LeaderboardScreenProps) {
         style={{
           marginTop: 40, background: "none", border: "2px solid #333",
           borderRadius: 6, color: "#FFF", padding: "10px 24px",
-          fontFamily: '"VCR OSD Mono", monospace', cursor: "pointer", fontSize: "0.9rem",
+          fontFamily: '"Noto Sans JP", sans-serif', cursor: "pointer", fontSize: "0.9rem",
         }}
       >
         &larr; BACK

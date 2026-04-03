@@ -23,8 +23,9 @@ export class Renderer {
 
   constructor(canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d")!;
-    this.width = canvas.width;
-    this.height = canvas.height;
+    // Use CSS pixel size (not the DPR-scaled canvas.width)
+    this.width = canvas.clientWidth || canvas.width;
+    this.height = canvas.clientHeight || canvas.height;
   }
 
   resize(w: number, h: number): void {
@@ -59,9 +60,9 @@ export class Renderer {
     const playerX = this.width - HIGHWAY_WIDTH - edgePadding;
     const highwayTop = 20;
 
-    // Draw highways
-    this.drawHighway(ctx, opponentX, highwayTop, 0.15);
-    this.drawHighway(ctx, playerX, highwayTop, 0.2);
+    // Draw highways (dark backgrounds so arrows pop over video)
+    this.drawHighway(ctx, opponentX, highwayTop, 0.75);
+    this.drawHighway(ctx, playerX, highwayTop, 0.8);
 
     // Draw hit windows visualization
     if (this.showHitWindows) {
@@ -102,7 +103,7 @@ export class Renderer {
     if (state.combo > 0) {
       const comboScale = effects.getComboScale();
       ctx.save();
-      ctx.font = `bold ${Math.round(28 * comboScale)}px "VCR OSD Mono", monospace`;
+      ctx.font = `bold ${Math.round(28 * comboScale)}px "Noto Sans JP", sans-serif`;
       ctx.textAlign = "center";
       ctx.fillStyle = "#FFF";
       ctx.globalAlpha = 0.9;
@@ -162,13 +163,13 @@ export class Renderer {
 
       if (held) {
         ctx.fillStyle = color;
-        ctx.globalAlpha = 0.7;
+        ctx.globalAlpha = 1;
         ctx.shadowColor = color;
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = 20;
       } else {
         ctx.strokeStyle = color;
-        ctx.globalAlpha = 0.4;
-        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.6;
+        ctx.lineWidth = 2.5;
       }
 
       if (held) ctx.fill();
@@ -217,14 +218,19 @@ export class Renderer {
     ctx.lineTo(-size * 0.3, size * 0.7);
     ctx.closePath();
 
+    // Glow
+    ctx.shadowColor = color;
+    ctx.shadowBlur = isOpponent ? 6 : 12;
+
     ctx.fillStyle = color;
-    ctx.globalAlpha = isOpponent ? 0.6 : 1;
+    ctx.globalAlpha = isOpponent ? 0.7 : 1;
     ctx.fill();
 
-    // Outline
+    // Bright outline
+    ctx.shadowBlur = 0;
     ctx.strokeStyle = "#FFF";
-    ctx.globalAlpha = isOpponent ? 0.2 : 0.4;
-    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = isOpponent ? 0.3 : 0.6;
+    ctx.lineWidth = 2;
     ctx.stroke();
 
     ctx.restore();

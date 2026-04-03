@@ -12,7 +12,7 @@ export default function SongSelect({ onSelect }: SongSelectProps) {
     <div style={{
       width: "100%", height: "100%", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#000",
-      fontFamily: '"VCR OSD Mono", monospace',
+      fontFamily: '"Noto Sans JP", sans-serif',
     }}>
       <h2 style={{ color: "#FFF", fontSize: "2rem", marginBottom: 50, letterSpacing: 4 }}>
         SELECT SONG
@@ -31,7 +31,7 @@ export default function SongSelect({ onSelect }: SongSelectProps) {
               background: hovered === song.id ? "#111" : "#0a0a0f",
               border: `2px solid ${hovered === song.id ? song.color : "#222"}`,
               borderRadius: 8, cursor: "pointer",
-              fontFamily: '"VCR OSD Mono", monospace',
+              fontFamily: '"Noto Sans JP", sans-serif',
               transition: "all 0.15s",
             }}
           >

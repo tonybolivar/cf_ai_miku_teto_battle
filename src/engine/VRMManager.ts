@@ -1,15 +1,33 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRM, VRMExpressionPresetName, VRMHumanBoneName } from "@pixiv/three-vrm";
+import { loadMMDCharacter, type MMDCharacter } from "./MMDDanceLoader";
 import type { Lane } from "../types/game";
 import type { StageManager } from "./StageManager";
+/** Linear interpolation sample from a keyframe track */
+function sampleTrack(times: Float32Array, values: Float32Array, t: number): number {
+  if (times.length === 0) return 0;
+  if (t <= times[0]) return values[0];
+  if (t >= times[times.length - 1]) return values[values.length - 1];
+  for (let i = 0; i < times.length - 1; i++) {
+    if (t >= times[i] && t < times[i + 1]) {
+      const alpha = (t - times[i]) / (times[i + 1] - times[i]);
+      return values[i] + (values[i + 1] - values[i]) * alpha;
+    }
+  }
+  return values[values.length - 1];
+}
 
-/** Arm/head poses for each lane's sing animation */
-const SING_POSES: Record<Lane, { headY: number; armAngle: number; side: "left" | "right" | "both" }> = {
-  0: { headY: -0.15, armAngle: -0.8, side: "left" },
-  1: { headY: -0.2,  armAngle: -0.4, side: "both" },
-  2: { headY: 0.2,   armAngle: 0.8,  side: "both" },
-  3: { headY: 0.15,  armAngle: 0.8,  side: "right" },
+/** Dramatic sing poses per lane - arm angles are offsets from idle (arms-down) position */
+const SING_POSES: Record<Lane, {
+  headX: number; headZ: number;
+  armAngle: number; side: "left" | "right" | "both";
+  spineX: number; spineZ: number;
+}> = {
+  0: { headX: 0,    headZ: 0.3,  armAngle: -1.4, side: "left",  spineX: 0,    spineZ: 0.1  }, // left: lean left, left arm up
+  1: { headX: 0.25, headZ: 0,    armAngle: -0.6, side: "both",  spineX: 0.1,  spineZ: 0    }, // down: nod down, arms out
+  2: { headX: -0.2, headZ: 0,    armAngle: -1.6, side: "both",  spineX: -0.1, spineZ: 0    }, // up: look up, both arms raised
+  3: { headX: 0,    headZ: -0.3, armAngle: -1.4, side: "right", spineX: 0,    spineZ: -0.1 }, // right: lean right, right arm up
 };
 
 interface CharacterState {
@@ -17,6 +35,11 @@ interface CharacterState {
   currentPose: Lane | null;
   poseTimer: number;
   idleBob: number;
+  // VMD dance animation
+  mixer: THREE.AnimationMixer | null;
+  danceAction: THREE.AnimationAction | null;
+  morphTracks: Map<string, { times: Float32Array; values: Float32Array }> | null;
+  hasDance: boolean;
 }
 
 /**
@@ -33,6 +56,7 @@ export class VRMManager {
   private stageManager: StageManager | null = null;
 
   private characters = new Map<string, CharacterState>();
+  private mmdCharacters = new Map<string, MMDCharacter>();
 
   // Fade overlay (for stage crossfade)
   private fadeQuad: THREE.Mesh | null = null;
@@ -46,9 +70,8 @@ export class VRMManager {
       antialias: true,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.2;
+    this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+    this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.autoClear = false;
 
     // Character scene (foreground, transparent background)
@@ -58,21 +81,13 @@ export class VRMManager {
     this.charCamera.position.set(0, 1.2, 4);
     this.charCamera.lookAt(0, 1, 0);
 
-    // Character lighting
-    const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+    // Character lighting -- even on both sides for MMD toon materials
+    const ambient = new THREE.AmbientLight(0xffffff, 1.8);
     this.charScene.add(ambient);
 
-    const key = new THREE.DirectionalLight(0xffffff, 1.5);
-    key.position.set(2, 3, 3);
-    this.charScene.add(key);
-
-    const fill = new THREE.DirectionalLight(0x8888ff, 0.4);
-    fill.position.set(-2, 1, 2);
-    this.charScene.add(fill);
-
-    const rim = new THREE.DirectionalLight(0xff88ff, 0.3);
-    rim.position.set(0, 2, -2);
-    this.charScene.add(rim);
+    const front = new THREE.DirectionalLight(0xffffff, 1.5);
+    front.position.set(0, 2, 5);
+    this.charScene.add(front);
 
     // Fade overlay scene (full-screen black quad for crossfade)
     this.fadeScene = new THREE.Scene();
@@ -116,18 +131,79 @@ export class VRMManager {
       currentPose: null,
       poseTimer: 0,
       idleBob: Math.random() * Math.PI * 2,
+      mixer: null,
+      danceAction: null,
+      morphTracks: null,
+      hasDance: false,
     });
   }
 
-  triggerSing(characterId: string, lane: Lane): void {
+  getCharacter(id: string): VRM | null {
+    return this.characters.get(id)?.vrm ?? null;
+  }
+
+  /** Load a PMX model with VMD dance animation (native MMD, no retargeting) */
+  async loadMMDCharacter(
+    id: string,
+    pmxUrl: string,
+    vmdUrls: string[],
+    position: THREE.Vector3,
+    rotationY = Math.PI,
+  ): Promise<void> {
+    const mmd = await loadMMDCharacter(pmxUrl, vmdUrls);
+
+    // Scale and position -- PMX models are ~20 units tall
+    const scale = 0.08;
+    mmd.mesh.scale.setScalar(scale);
+    mmd.mesh.position.copy(position);
+    mmd.mesh.rotation.y = 0; // PMX models face -Z by default, camera is at +Z
+
+    this.charScene.add(mmd.mesh);
+    this.mmdCharacters.set(id, mmd);
+    console.log(`[VRM] MMD character "${id}" loaded at`, position);
+  }
+
+  /** Apply a pre-built AnimationClip as the dance for a character */
+  applyDance(characterId: string, clip: THREE.AnimationClip): void {
     const char = this.characters.get(characterId);
     if (!char) return;
+
+    const mixer = new THREE.AnimationMixer(char.vrm.scene);
+    const action = mixer.clipAction(clip);
+    action.play();
+
+    char.mixer = mixer;
+    char.danceAction = action;
+    char.hasDance = true;
+    char.morphTracks = null;
+
+    console.log(`[VRM] Dance applied to ${characterId}, ${clip.tracks.length} tracks, ${clip.duration.toFixed(1)}s`);
+  }
+
+  /** Start all dance animations from a given time offset */
+  startDances(offsetSeconds = 0): void {
+    for (const [, char] of this.characters) {
+      if (char.mixer && char.danceAction) {
+        char.mixer.setTime(offsetSeconds);
+      }
+    }
+  }
+
+  triggerSing(characterId: string, lane: Lane): void {
+    if (this.mmdCharacters.has(characterId)) return; // MMD characters have their own dance
+    const char = this.characters.get(characterId);
+    if (!char || char.hasDance) return;
     char.currentPose = lane;
-    char.poseTimer = 300;
+    char.poseTimer = 450; // hold pose longer so it's visible
   }
 
   update(dt: number): void {
     const delta = this.clock.getDelta();
+
+    // Update MMD characters (native animation, no manual poses)
+    for (const [, mmd] of this.mmdCharacters) {
+      mmd.helper.update(delta);
+    }
 
     // Update stage crossfade
     this.stageManager?.update(dt);
@@ -141,6 +217,23 @@ export class VRMManager {
 
     for (const [, char] of this.characters) {
       const { vrm } = char;
+
+      // If this character has a VMD dance, advance the mixer and apply morph tracks
+      if (char.hasDance && char.mixer) {
+        char.mixer.update(delta);
+
+        // Apply facial morph tracks manually
+        if (char.morphTracks) {
+          const time = char.mixer.time;
+          for (const [exprName, track] of char.morphTracks) {
+            const value = sampleTrack(track.times, track.values, time);
+            vrm.expressionManager?.setValue(exprName, value);
+          }
+        }
+
+        vrm.update(delta);
+        continue; // skip manual pose logic
+      }
 
       if (char.poseTimer > 0) {
         char.poseTimer -= dt;
@@ -158,30 +251,40 @@ export class VRMManager {
 
       if (char.currentPose !== null) {
         const pose = SING_POSES[char.currentPose];
+        const lerpSpeed = 0.4; // fast snap into pose
 
+        // Head movement
         const head = humanoid.getNormalizedBoneNode(VRMHumanBoneName.Head);
-        if (head) head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, pose.headY, 0.3);
+        if (head) {
+          head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, pose.headX, lerpSpeed);
+          head.rotation.z = THREE.MathUtils.lerp(head.rotation.z, pose.headZ, lerpSpeed);
+        }
 
+        // Spine lean
+        const spine = humanoid.getNormalizedBoneNode(VRMHumanBoneName.Spine);
+        if (spine) {
+          spine.rotation.x = THREE.MathUtils.lerp(spine.rotation.x, pose.spineX, lerpSpeed);
+          spine.rotation.z = THREE.MathUtils.lerp(spine.rotation.z, pose.spineZ, lerpSpeed);
+        }
+
+        // Arms - offset from idle arms-down position
         const leftArm = humanoid.getNormalizedBoneNode(VRMHumanBoneName.LeftUpperArm);
         const rightArm = humanoid.getNormalizedBoneNode(VRMHumanBoneName.RightUpperArm);
 
-        // Singing poses are relative offsets from the idle arms-down position
         if (pose.side === "left" || pose.side === "both") {
-          if (leftArm) leftArm.rotation.z = THREE.MathUtils.lerp(leftArm.rotation.z, IDLE_LEFT_ARM_Z + pose.armAngle, 0.3);
-        }
-        if (pose.side === "right" || pose.side === "both") {
-          if (rightArm) rightArm.rotation.z = THREE.MathUtils.lerp(rightArm.rotation.z, IDLE_RIGHT_ARM_Z - pose.armAngle, 0.3);
-        }
-
-        // Keep non-singing arm in idle position
-        if (pose.side === "left") {
-          if (rightArm) rightArm.rotation.z = THREE.MathUtils.lerp(rightArm.rotation.z, IDLE_RIGHT_ARM_Z, 0.15);
-        }
-        if (pose.side === "right") {
+          if (leftArm) leftArm.rotation.z = THREE.MathUtils.lerp(leftArm.rotation.z, IDLE_LEFT_ARM_Z + pose.armAngle, lerpSpeed);
+        } else {
           if (leftArm) leftArm.rotation.z = THREE.MathUtils.lerp(leftArm.rotation.z, IDLE_LEFT_ARM_Z, 0.15);
         }
 
-        vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, 0.7);
+        if (pose.side === "right" || pose.side === "both") {
+          if (rightArm) rightArm.rotation.z = THREE.MathUtils.lerp(rightArm.rotation.z, IDLE_RIGHT_ARM_Z - pose.armAngle, lerpSpeed);
+        } else {
+          if (rightArm) rightArm.rotation.z = THREE.MathUtils.lerp(rightArm.rotation.z, IDLE_RIGHT_ARM_Z, 0.15);
+        }
+
+        // Open mouth
+        vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, 0.8);
       } else {
         // Idle: arms down, gentle body sway
         const bobHead = Math.sin(char.idleBob) * 0.04;
@@ -191,11 +294,13 @@ export class VRMManager {
         if (head) {
           head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, bobHead, 0.1);
           head.rotation.y = THREE.MathUtils.lerp(head.rotation.y, bobSway, 0.1);
+          head.rotation.z = THREE.MathUtils.lerp(head.rotation.z, 0, 0.1);
         }
 
         const spine = humanoid.getNormalizedBoneNode(VRMHumanBoneName.Spine);
         if (spine) {
           spine.rotation.x = THREE.MathUtils.lerp(spine.rotation.x, Math.sin(char.idleBob * 0.5) * 0.015, 0.1);
+          spine.rotation.z = THREE.MathUtils.lerp(spine.rotation.z, 0, 0.1);
         }
 
         const leftArm = humanoid.getNormalizedBoneNode(VRMHumanBoneName.LeftUpperArm);
@@ -223,7 +328,7 @@ export class VRMManager {
     }
 
     // 2. Render characters on top (depth buffer cleared so characters always show)
-    if (this.characters.size > 0) {
+    if (this.characters.size > 0 || this.mmdCharacters.size > 0) {
       this.renderer.clearDepth();
       this.renderer.render(this.charScene, this.charCamera);
     }
@@ -236,9 +341,9 @@ export class VRMManager {
   }
 
   setCameraDual(): void {
-    this.charCamera.position.set(0, 1.2, 5);
-    this.charCamera.lookAt(0, 1, 0);
-    this.charCamera.fov = 30;
+    this.charCamera.position.set(0, 0.9, 5.5);
+    this.charCamera.lookAt(0, 0.7, 0);
+    this.charCamera.fov = 35;
     this.charCamera.updateProjectionMatrix();
   }
 

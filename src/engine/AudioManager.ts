@@ -9,17 +9,28 @@ export class AudioManager {
 
   async init(): Promise<void> {
     this.ctx = new AudioContext();
+    // Track for cleanup on hot reload
+    const win = window as any;
+    if (!win.__audioContexts) win.__audioContexts = [];
+    win.__audioContexts.push(this.ctx);
   }
 
   async load(url: string): Promise<void> {
     if (!this.ctx) await this.init();
+    console.log("[Audio] Loading:", url);
     const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Audio fetch failed: ${resp.status} ${url}`);
     const arrayBuf = await resp.arrayBuffer();
+    console.log("[Audio] Decoding:", arrayBuf.byteLength, "bytes");
     this.buffer = await this.ctx!.decodeAudioData(arrayBuf);
+    console.log("[Audio] Loaded OK, duration:", this.buffer.duration.toFixed(1), "s");
   }
 
   play(startOffsetMs = 0, delayMs = 0): void {
-    if (!this.ctx || !this.buffer) return;
+    if (!this.ctx || !this.buffer) {
+      console.warn("[Audio] play() called but ctx/buffer missing:", { ctx: !!this.ctx, buffer: !!this.buffer });
+      return;
+    }
 
     this.stop();
     this.startOffset = startOffsetMs;
@@ -73,6 +84,13 @@ export class AudioManager {
     if (this.source) {
       this.source.playbackRate.value = rate;
     }
+  }
+
+  close(): void {
+    this.stop();
+    this.ctx?.close().catch(() => {});
+    this.ctx = null;
+    this.buffer = null;
   }
 
   resume(): Promise<void> {

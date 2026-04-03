@@ -9,11 +9,9 @@ import CountdownScreen from "./screens/CountdownScreen";
 import GameScreen from "./screens/GameScreen";
 import ResultsScreen from "./screens/ResultsScreen";
 import LeaderboardScreen from "./screens/LeaderboardScreen";
-import { TEST_CHART } from "./data/charts/test_chart";
 import { PO_PI_PO_CHART } from "./data/charts/po_pi_po";
-import { MELT_CHART } from "./data/charts/melt";
-import { KASANE_TERRITORY_CHART } from "./data/charts/kasane_territory";
-import { SONG_LIST } from "./data/songs";
+import { MESMERIZER_CHART } from "./data/charts/mesmerizer";
+import { SONG_LIST, SONG_ASSETS } from "./data/songs";
 import type { Character, GameMode, BotDifficulty, Chart } from "./types/game";
 
 type Screen =
@@ -47,10 +45,8 @@ interface GameResult {
 
 // Chart registry — songs will be loaded dynamically; test chart is always available
 const CHART_REGISTRY: Record<string, Chart> = {
-  test: TEST_CHART,
   po_pi_po: PO_PI_PO_CHART,
-  melt: MELT_CHART,
-  kasane_territory: KASANE_TERRITORY_CHART,
+  mesmerizer: MESMERIZER_CHART,
 };
 
 export async function loadChart(songId: string): Promise<Chart> {
@@ -66,8 +62,8 @@ export async function loadChart(songId: string): Promise<Chart> {
     }
   } catch { /* fallback */ }
 
-  // Fallback to test chart
-  return TEST_CHART;
+  // Fallback to first available
+  return PO_PI_PO_CHART;
 }
 
 export default function App() {
@@ -80,7 +76,7 @@ export default function App() {
     songId: "test",
     lobbyCode: null,
   });
-  const [chart, setChart] = useState<Chart>(TEST_CHART);
+  const [chart, setChart] = useState<Chart>(PO_PI_PO_CHART);
   const [result, setResult] = useState<GameResult | null>(null);
 
   const handleCharSelect = useCallback((character: Character) => {
@@ -106,11 +102,7 @@ export default function App() {
   }, []);
 
   const handleTrashTalkDone = useCallback(() => {
-    setScreen("countdown");
-  }, []);
-
-  const handleCountdownDone = useCallback(() => {
-    setScreen("game");
+    setScreen("game"); // GameScreen has its own countdown after loading
   }, []);
 
   const handleGameOver = useCallback((
@@ -159,14 +151,16 @@ export default function App() {
         />
       );
 
-    case "countdown":
-      return <CountdownScreen onDone={handleCountdownDone} />;
-
     case "game": {
-      const vrmUrls: Record<string, string> = {
+      // Default VRMs, overridden by song-specific assets
+      const defaultVrm: Record<string, string> = {
         miku: "/assets/miku.vrm",
         teto: "/assets/teto.vrm",
       };
+      const songAssets = SONG_ASSETS[config.songId];
+      const playerVrm = songAssets?.vrmUrls?.[config.character] ?? defaultVrm[config.character];
+      const opponentVrm = songAssets?.vrmUrls?.[config.opponentCharacter] ?? defaultVrm[config.opponentCharacter];
+
       return (
         <GameScreen
           chart={chart}
@@ -174,8 +168,10 @@ export default function App() {
           opponentCharacter={config.opponentCharacter}
           mode={config.mode}
           botDifficulty={config.botDifficulty ?? "medium"}
-          playerVrmUrl={vrmUrls[config.character]}
-          opponentVrmUrl={vrmUrls[config.opponentCharacter]}
+          playerVrmUrl={playerVrm}
+          opponentVrmUrl={opponentVrm}
+          playerStageUrl={songAssets?.noStage ? undefined : "/assets/stage_teto.glb"}
+          songId={config.songId}
           onGameOver={handleGameOver}
         />
       );

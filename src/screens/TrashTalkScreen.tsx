@@ -94,23 +94,24 @@ export default function TrashTalkScreen({
     <div style={{
       width: "100%", height: "100%", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#000",
-      fontFamily: '"VCR OSD Mono", monospace',
+      fontFamily: '"Noto Sans JP", sans-serif',
     }}>
       {/* Character name */}
       <div style={{ color: oppColor, fontSize: "1.5rem", letterSpacing: 4, marginBottom: 30 }}>
         {oppName.toUpperCase()}
       </div>
 
-      {/* Character icon placeholder */}
-      <div style={{
-        width: 100, height: 130, marginBottom: 20,
-        background: `linear-gradient(135deg, ${oppColor}33, ${oppColor}11)`,
-        border: `2px solid ${oppColor}44`, borderRadius: 12,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: "2.5rem", color: oppColor,
-      }}>
-        {oppName[0]}
-      </div>
+      {/* Character portrait */}
+      <img
+        src={opponentCharacter === "miku" ? "/assets/portrait_miku.png" : "/assets/portrait_teto.jpg"}
+        alt={oppName}
+        style={{
+          width: 140, height: 180, marginBottom: 20,
+          objectFit: "cover", objectPosition: "top",
+          borderRadius: 12,
+          border: `2px solid ${oppColor}66`,
+        }}
+      />
 
       {/* Speech bubble */}
       <div style={{

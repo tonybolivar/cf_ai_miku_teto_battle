@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { GameLoop, type GameLoopConfig } from "../engine/GameLoop";
 import { useGameState } from "../hooks/useGameState";
 import { CHARACTER_COLORS, type Character, type Chart, type GameMode, type BotDifficulty } from "../types/game";
+import { SONG_ASSETS } from "../data/songs";
 import LyricsDisplay from "./LyricsDisplay";
 
 interface GameScreenProps {
@@ -14,6 +15,7 @@ interface GameScreenProps {
   opponentVrmUrl?: string;
   playerStageUrl?: string;
   opponentStageUrl?: string;
+  songId?: string;
   onGameOver: (winner: "player" | "opponent" | "draw", playerScore: number, opponentScore: number, maxCombo: number, misses: number) => void;
 }
 
@@ -27,12 +29,18 @@ export default function GameScreen({
   opponentVrmUrl,
   playerStageUrl,
   opponentStageUrl,
+  songId,
   onGameOver,
 }: GameScreenProps) {
   const noteCanvasRef = useRef<HTMLCanvasElement>(null);
   const vrmCanvasRef = useRef<HTMLCanvasElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const gameLoopRef = useRef<GameLoop | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [phase, setPhase] = useState<"loading" | "countdown" | "playing">("loading");
+  const [countdown, setCountdown] = useState(3);
+
+  const assets = songId ? SONG_ASSETS[songId] : undefined;
+  const bgVideo = assets?.backgroundVideo;
   const [error, setError] = useState<string | null>(null);
 
   const snapshot = useGameState(gameLoopRef.current?.state ?? null);
@@ -42,13 +50,19 @@ export default function GameScreen({
     const vrmCanvas = vrmCanvasRef.current;
     if (!noteCanvas || !vrmCanvas) return;
 
-    // Size canvases to container
+    // Size canvases to actual pixel dimensions (fixes stretching on HiDPI)
+    const dpr = window.devicePixelRatio || 1;
     const w = window.innerWidth;
     const h = window.innerHeight;
-    noteCanvas.width = w;
-    noteCanvas.height = h;
-    vrmCanvas.width = w;
-    vrmCanvas.height = h;
+    noteCanvas.width = w * dpr;
+    noteCanvas.height = h * dpr;
+    noteCanvas.style.width = w + "px";
+    noteCanvas.style.height = h + "px";
+    const noteCtx = noteCanvas.getContext("2d");
+    if (noteCtx) noteCtx.scale(dpr, dpr);
+    // VRM canvas size is set by the Three.js renderer (setSize handles DPR internally)
+    vrmCanvas.style.width = w + "px";
+    vrmCanvas.style.height = h + "px";
 
     // Parse dev tool query params
     const params = new URLSearchParams(window.location.search);
@@ -71,6 +85,7 @@ export default function GameScreen({
       opponentVrmUrl,
       playerStageUrl,
       opponentStageUrl,
+      songId,
       onGameOver: (winner) => {
         const state = loop.state;
         onGameOver(winner, state.score, state.opponentScore, state.maxCombo, state.misses);
@@ -83,19 +98,59 @@ export default function GameScreen({
     loop
       .init()
       .then(() => {
-        setLoading(false);
-        loop.start();
+        // Resize VRM renderer to match window
+        loop.vrm?.resize(w, h);
+        // Everything loaded -- start countdown
+        setPhase("countdown");
+        setCountdown(3);
       })
       .catch((err) => {
         console.error("Game init failed:", err);
-        setError(err.message);
+        setError(String(err));
       });
 
-    return () => {
+    // Close audio on hot reload / unmount
+    const cleanup = () => {
       loop.stop();
       gameLoopRef.current = null;
     };
+    window.addEventListener("beforeunload", cleanup);
+
+    return () => {
+      window.removeEventListener("beforeunload", cleanup);
+      cleanup();
+    };
   }, [chart, playerCharacter, opponentCharacter]);
+
+  // Countdown timer: 3, 2, 1, GO! then start the game
+  useEffect(() => {
+    if (phase !== "countdown") return;
+
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown((c) => c - 1), 700);
+      return () => clearTimeout(timer);
+    }
+
+    // "GO!" visible -- start everything after a beat
+    const timer = setTimeout(() => {
+      const loop = gameLoopRef.current;
+      if (loop) {
+        loop.start().then(() => {
+          if (videoRef.current) {
+            videoRef.current.currentTime = 0;
+            videoRef.current.play().catch(() => {});
+          }
+          setPhase("playing");
+        }).catch((e) => {
+          console.error("[GameScreen] start() failed:", e);
+          setPhase("playing"); // show game anyway
+        });
+      } else {
+        setPhase("playing");
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [phase, countdown]);
 
   const playerColor = CHARACTER_COLORS[playerCharacter];
   const opponentColor = CHARACTER_COLORS[opponentCharacter];
@@ -106,16 +161,31 @@ export default function GameScreen({
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative", background: "#000", overflow: "hidden" }}>
-      {/* Three.js VRM layer (background) */}
+      {/* Background video (if song has one) */}
+      {bgVideo && (
+        <video
+          ref={videoRef}
+          src={bgVideo}
+          muted
+          playsInline
+          preload="auto"
+          style={{
+            position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+            objectFit: "cover", zIndex: 0,
+          }}
+        />
+      )}
+
+      {/* Three.js VRM layer */}
       <canvas
         ref={vrmCanvasRef}
-        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 0 }}
+        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: bgVideo ? 1 : 0 }}
       />
 
       {/* Note highway canvas (foreground, transparent bg) */}
       <canvas
         ref={noteCanvasRef}
-        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1 }}
+        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 2 }}
       />
 
       {/* Lyrics display */}
@@ -128,7 +198,7 @@ export default function GameScreen({
       )}
 
       {/* HUD overlay */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2, padding: "10px 20px 15px" }}>
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 5, padding: "10px 20px 15px", background: "linear-gradient(transparent, rgba(0,0,0,0.7) 30%)" }}>
         {/* Health bar */}
         <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
           {/* Opponent icon */}
@@ -175,7 +245,7 @@ export default function GameScreen({
         {/* Score row */}
         <div style={{
           display: "flex", justifyContent: "center", gap: 40,
-          fontFamily: '"VCR OSD Mono", monospace', fontSize: 16, color: "#FFF",
+          fontFamily: '"Noto Sans JP", sans-serif', fontSize: 16, color: "#FFF",
         }}>
           <span>SCORE: {String(snapshot.score).padStart(6, "0")}</span>
           <span>COMBO: {snapshot.combo}</span>
@@ -184,14 +254,44 @@ export default function GameScreen({
       </div>
 
       {/* Loading overlay */}
-      {loading && (
+      {phase === "loading" && (
         <div style={{
           position: "absolute", inset: 0, zIndex: 10,
           display: "flex", alignItems: "center", justifyContent: "center",
           background: "rgba(0,0,0,0.9)",
-          fontFamily: '"VCR OSD Mono", monospace', fontSize: 24, color: "#FFF",
+          fontFamily: '"Noto Sans JP", sans-serif', fontSize: 24, color: "#FFF",
         }}>
           {error ? `Error: ${error}` : "Loading..."}
+        </div>
+      )}
+
+      {/* Countdown overlay */}
+      {phase === "countdown" && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 10,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.6)",
+          fontFamily: '"Noto Sans JP", sans-serif',
+        }}>
+          <span
+            key={countdown}
+            style={{
+              fontSize: countdown > 0 ? "8rem" : "6rem",
+              color: countdown > 0 ? "#FFF" : "#12FA05",
+              fontWeight: "bold",
+              textShadow: countdown === 0 ? "0 0 40px #12FA05" : "0 0 20px rgba(255,255,255,0.3)",
+              animation: "countPop 0.4s ease-out",
+            }}
+          >
+            {countdown > 0 ? countdown : "GO!"}
+          </span>
+          <style>{`
+            @keyframes countPop {
+              0% { transform: scale(2); opacity: 0; }
+              50% { opacity: 1; }
+              100% { transform: scale(1); }
+            }
+          `}</style>
         </div>
       )}
     </div>

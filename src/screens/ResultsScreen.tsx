@@ -48,7 +48,7 @@ export default function ResultsScreen({
     <div style={{
       width: "100%", height: "100%", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#000",
-      fontFamily: '"VCR OSD Mono", monospace',
+      fontFamily: '"Noto Sans JP", sans-serif',
     }}>
       {/* Winner banner */}
       <h1 style={{
@@ -95,7 +95,7 @@ export default function ResultsScreen({
             style={{
               padding: "10px 16px", background: "#111", border: "2px solid #333",
               borderRadius: 6, color: "#FFF", fontSize: "1rem",
-              fontFamily: '"VCR OSD Mono", monospace', outline: "none", width: 180,
+              fontFamily: '"Noto Sans JP", sans-serif', outline: "none", width: 180,
             }}
           />
           <button
@@ -103,7 +103,7 @@ export default function ResultsScreen({
             style={{
               padding: "10px 20px", background: "#39C5BB", border: "none",
               borderRadius: 6, color: "#000", fontSize: "0.9rem",
-              fontFamily: '"VCR OSD Mono", monospace', cursor: "pointer",
+              fontFamily: '"Noto Sans JP", sans-serif', cursor: "pointer",
             }}
           >
             SUBMIT
@@ -152,7 +152,7 @@ function NavButton({ label, onClick }: { label: string; onClick: () => void }) {
       style={{
         padding: "12px 24px", background: "none", border: "2px solid #333",
         borderRadius: 6, color: "#FFF", fontSize: "0.9rem",
-        fontFamily: '"VCR OSD Mono", monospace', cursor: "pointer",
+        fontFamily: '"Noto Sans JP", sans-serif', cursor: "pointer",
         transition: "border-color 0.15s",
       }}
       onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#888")}

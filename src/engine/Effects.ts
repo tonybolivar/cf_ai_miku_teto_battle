@@ -117,7 +117,7 @@ export class Effects {
       const style = RATING_STYLES[p.result];
       ctx.save();
       ctx.globalAlpha = p.opacity;
-      ctx.font = `bold ${Math.round(32 * p.scale)}px "VCR OSD Mono", monospace`;
+      ctx.font = `bold ${Math.round(32 * p.scale)}px "Noto Sans JP", sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
