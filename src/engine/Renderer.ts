@@ -94,9 +94,10 @@ export class Renderer {
       this.drawNote(ctx, note.lane, note.time, songTime, playerX, highwayTop, note.duration, false);
     }
 
-    // Draw hold tails
+    // Draw hold tails + arrow locked at receptor
     for (const hold of playerEngine.getActiveHolds()) {
       this.drawHoldTail(ctx, hold.lane, hold.time, hold.time + hold.duration, songTime, playerX, highwayTop);
+      this.drawNote(ctx, hold.lane, songTime, songTime, playerX, highwayTop, 0, false);
     }
     for (const hold of opponentEngine.getActiveHolds()) {
       this.drawHoldTail(ctx, hold.lane, hold.time, hold.time + hold.duration, songTime, opponentX, highwayTop);

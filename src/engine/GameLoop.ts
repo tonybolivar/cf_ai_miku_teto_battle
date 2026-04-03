@@ -261,6 +261,14 @@ export class GameLoop {
       this.pvpSend({ type: "miss", noteId: miss.noteId, lane: miss.lane });
     }
 
+    // Auto-activate hold notes when the player is already holding the key
+    const heldLanes = new Set(([0, 1, 2, 3] as Lane[]).filter((l) => this.input.isHeld(l)));
+    const autoHolds = this.playerNotes.autoActivateHolds(songTime, heldLanes);
+    for (const h of autoHolds) {
+      this.state.applyPlayerHit(h.result, h.points, h.healthDelta);
+      this.pvpSend({ type: "hit", noteId: h.noteId, rating: h.result as any, lane: h.lane });
+    }
+
     // Auto-consume notes inside active holds (slide notes)
     const held = this.playerNotes.consumeHeldNotes(songTime);
     for (const h of held) {

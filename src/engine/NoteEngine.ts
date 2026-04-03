@@ -44,18 +44,25 @@ export class NoteEngine {
     return this.notes;
   }
 
-  /** Judge a key press against the closest unjudged note in the lane */
+  /** Judge a key press against the closest unjudged note in the lane.
+   *  Prefers hold notes over taps when both are within the window. */
   judgeInput(lane: Lane, songTime: number): JudgeOutput | null {
     const outerWindow = HIT_WINDOWS[HIT_WINDOWS.length - 1].window;
     let closest: TrackedNote | null = null;
     let closestDiff = Infinity;
 
     for (const note of this.notes) {
-      if (note.judged || note.lane !== lane || note.isOpponent) continue;
+      if (note.judged || note.holdActive || note.lane !== lane || note.isOpponent) continue;
       const diff = Math.abs(note.time - songTime);
       if (diff <= outerWindow && diff < closestDiff) {
-        closest = note;
-        closestDiff = diff;
+        // Prefer hold notes: if we already found a tap and this is a hold at similar time, pick the hold
+        if (closest && closest.duration === 0 && note.duration > 0 && Math.abs(diff - closestDiff) < 50) {
+          closest = note;
+          closestDiff = diff;
+        } else if (diff < closestDiff) {
+          closest = note;
+          closestDiff = diff;
+        }
       }
     }
 
@@ -149,6 +156,32 @@ export class NoteEngine {
       return null;
     }
     return null;
+  }
+
+  /** Auto-activate hold notes when the player is already holding the key */
+  autoActivateHolds(songTime: number, heldLanes: Set<Lane>): JudgeOutput[] {
+    const outerWindow = HIT_WINDOWS[HIT_WINDOWS.length - 1].window;
+    const activated: JudgeOutput[] = [];
+
+    for (const note of this.notes) {
+      if (note.judged || note.holdActive || note.isOpponent) continue;
+      if (note.duration <= 0) continue;
+      if (!heldLanes.has(note.lane)) continue;
+      // Note is within the hit window and player is holding the key
+      const diff = Math.abs(note.time - songTime);
+      if (diff <= outerWindow) {
+        note.holdActive = true;
+        activated.push({
+          noteId: note.noteId,
+          result: diff <= 45 ? "sick" : diff <= 90 ? "good" : "bad",
+          points: diff <= 45 ? 350 : diff <= 90 ? 200 : 100,
+          healthDelta: diff <= 45 ? 0.023 : diff <= 90 ? 0.013 : -0.005,
+          lane: note.lane,
+        });
+      }
+    }
+
+    return activated;
   }
 
   /** Auto-consume notes that fall within an active hold's duration,
