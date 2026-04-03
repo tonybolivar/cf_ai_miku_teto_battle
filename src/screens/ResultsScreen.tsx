@@ -64,7 +64,10 @@ export default function ResultsScreen({
     try {
       await fetch("/api/leaderboard", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Leaderboard-Secret": "dev-secret-change-in-production",
+        },
         body: JSON.stringify({ name: name.trim(), score: playerScore, song: "", character: playerCharacter }),
       });
     } catch { /* ignore */ }
