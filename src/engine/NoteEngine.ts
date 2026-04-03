@@ -202,16 +202,13 @@ export class NoteEngine {
       if (!hold.holdActive) continue;
       const holdEnd = hold.time + hold.duration;
 
-      // Auto-consume overlapping notes in the same lane
+      // Auto-consume overlapping TAP notes in the same lane (skip other holds)
       for (const note of this.notes) {
         if (note === hold || note.judged || note.isOpponent) continue;
         if (note.lane !== hold.lane) continue;
+        if (note.duration > 0) continue; // Don't eat other holds — they activate independently
         if (note.time > hold.time && note.time <= holdEnd + 50 && songTime >= note.time) {
           note.judged = true;
-          // If the consumed note is itself a hold, extend the current hold
-          if (note.duration > 0) {
-            hold.duration = (note.time - hold.time) + note.duration;
-          }
           consumed.push({
             noteId: note.noteId,
             result: "sick",
