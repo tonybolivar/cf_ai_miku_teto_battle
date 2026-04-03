@@ -1,0 +1,199 @@
+import { useEffect, useRef, useState, useCallback } from "react";
+import { GameLoop, type GameLoopConfig } from "../engine/GameLoop";
+import { useGameState } from "../hooks/useGameState";
+import { CHARACTER_COLORS, type Character, type Chart, type GameMode, type BotDifficulty } from "../types/game";
+import LyricsDisplay from "./LyricsDisplay";
+
+interface GameScreenProps {
+  chart: Chart;
+  playerCharacter: Character;
+  opponentCharacter: Character;
+  mode?: GameMode;
+  botDifficulty?: BotDifficulty;
+  playerVrmUrl?: string;
+  opponentVrmUrl?: string;
+  playerStageUrl?: string;
+  opponentStageUrl?: string;
+  onGameOver: (winner: "player" | "opponent" | "draw", playerScore: number, opponentScore: number, maxCombo: number, misses: number) => void;
+}
+
+export default function GameScreen({
+  chart,
+  playerCharacter,
+  opponentCharacter,
+  mode = "bot",
+  botDifficulty = "medium",
+  playerVrmUrl,
+  opponentVrmUrl,
+  playerStageUrl,
+  opponentStageUrl,
+  onGameOver,
+}: GameScreenProps) {
+  const noteCanvasRef = useRef<HTMLCanvasElement>(null);
+  const vrmCanvasRef = useRef<HTMLCanvasElement>(null);
+  const gameLoopRef = useRef<GameLoop | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const snapshot = useGameState(gameLoopRef.current?.state ?? null);
+
+  useEffect(() => {
+    const noteCanvas = noteCanvasRef.current;
+    const vrmCanvas = vrmCanvasRef.current;
+    if (!noteCanvas || !vrmCanvas) return;
+
+    // Size canvases to container
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    noteCanvas.width = w;
+    noteCanvas.height = h;
+    vrmCanvas.width = w;
+    vrmCanvas.height = h;
+
+    // Parse dev tool query params
+    const params = new URLSearchParams(window.location.search);
+    const startAt = params.get("startAt") ? Number(params.get("startAt")) : undefined;
+    const slowmo = params.get("slowmo") ? Number(params.get("slowmo")) : undefined;
+    const showHitWindows = params.get("hitwindow") === "1";
+
+    const config: GameLoopConfig = {
+      noteCanvas,
+      vrmCanvas,
+      chart,
+      playerCharacter,
+      opponentCharacter,
+      mode,
+      botDifficulty: botDifficulty ?? "medium",
+      startAt,
+      slowmo,
+      showHitWindows,
+      playerVrmUrl,
+      opponentVrmUrl,
+      playerStageUrl,
+      opponentStageUrl,
+      onGameOver: (winner) => {
+        const state = loop.state;
+        onGameOver(winner, state.score, state.opponentScore, state.maxCombo, state.misses);
+      },
+    };
+
+    const loop = new GameLoop(config);
+    gameLoopRef.current = loop;
+
+    loop
+      .init()
+      .then(() => {
+        setLoading(false);
+        loop.start();
+      })
+      .catch((err) => {
+        console.error("Game init failed:", err);
+        setError(err.message);
+      });
+
+    return () => {
+      loop.stop();
+      gameLoopRef.current = null;
+    };
+  }, [chart, playerCharacter, opponentCharacter]);
+
+  const playerColor = CHARACTER_COLORS[playerCharacter];
+  const opponentColor = CHARACTER_COLORS[opponentCharacter];
+
+  // Health bar: opponent fills from left, player fills from right
+  // Total health = 2.0; player's portion = snapshot.health / 2.0
+  const playerPct = (snapshot.health / 2.0) * 100;
+
+  return (
+    <div style={{ width: "100%", height: "100%", position: "relative", background: "#000", overflow: "hidden" }}>
+      {/* Three.js VRM layer (background) */}
+      <canvas
+        ref={vrmCanvasRef}
+        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 0 }}
+      />
+
+      {/* Note highway canvas (foreground, transparent bg) */}
+      <canvas
+        ref={noteCanvasRef}
+        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1 }}
+      />
+
+      {/* Lyrics display */}
+      {chart.lyrics.length > 0 && gameLoopRef.current && (
+        <LyricsDisplay
+          lyrics={chart.lyrics}
+          getSongTime={() => gameLoopRef.current?.audio.getSongTime() ?? 0}
+          chartOffset={chart.chartOffset}
+        />
+      )}
+
+      {/* HUD overlay */}
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2, padding: "10px 20px 15px" }}>
+        {/* Health bar */}
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+          {/* Opponent icon */}
+          <div style={{
+            width: 36, height: 36, borderRadius: "50%", background: opponentColor,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 14, fontWeight: "bold", flexShrink: 0,
+          }}>
+            {opponentCharacter === "teto" ? "T" : "M"}
+          </div>
+
+          {/* Health bar container */}
+          <div style={{
+            flex: 1, height: 20, margin: "0 10px",
+            background: "#222", borderRadius: 4, overflow: "hidden",
+            border: "2px solid #444", position: "relative",
+          }}>
+            {/* Opponent portion (left side) */}
+            <div style={{
+              position: "absolute", left: 0, top: 0, bottom: 0,
+              width: `${100 - playerPct}%`,
+              background: `linear-gradient(90deg, ${opponentColor}cc, ${opponentColor}88)`,
+              transition: "width 0.1s ease-out",
+            }} />
+            {/* Player portion (right side) */}
+            <div style={{
+              position: "absolute", right: 0, top: 0, bottom: 0,
+              width: `${playerPct}%`,
+              background: `linear-gradient(90deg, ${playerColor}88, ${playerColor}cc)`,
+              transition: "width 0.1s ease-out",
+            }} />
+          </div>
+
+          {/* Player icon */}
+          <div style={{
+            width: 36, height: 36, borderRadius: "50%", background: playerColor,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 14, fontWeight: "bold", flexShrink: 0,
+          }}>
+            {playerCharacter === "miku" ? "M" : "T"}
+          </div>
+        </div>
+
+        {/* Score row */}
+        <div style={{
+          display: "flex", justifyContent: "center", gap: 40,
+          fontFamily: '"VCR OSD Mono", monospace', fontSize: 16, color: "#FFF",
+        }}>
+          <span>SCORE: {String(snapshot.score).padStart(6, "0")}</span>
+          <span>COMBO: {snapshot.combo}</span>
+          <span>MISSES: {snapshot.misses}</span>
+        </div>
+      </div>
+
+      {/* Loading overlay */}
+      {loading && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 10,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.9)",
+          fontFamily: '"VCR OSD Mono", monospace', fontSize: 24, color: "#FFF",
+        }}>
+          {error ? `Error: ${error}` : "Loading..."}
+        </div>
+      )}
+    </div>
+  );
+}

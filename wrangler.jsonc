@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cf-ai-miku-teto-battle",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "single-page-application"
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "LOBBY", "class_name": "LobbyDO" }
+    ]
+  },
+  // KV and AI bindings added when deploying (require wrangler login)
+  // "kv_namespaces": [{ "binding": "LEADERBOARD", "id": "..." }],
+  // "ai": { "binding": "AI" },
+  "vars": {
+    "LEADERBOARD_SECRET": "dev-secret-change-in-production"
+  },
+  "migrations": [
+    { "tag": "v1", "new_classes": ["LobbyDO"] }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
