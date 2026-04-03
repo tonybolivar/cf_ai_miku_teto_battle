@@ -129,7 +129,7 @@ export class LobbyDO implements DurableObject {
       this.state.botDifficulty = url.searchParams.get("botDifficulty") as any || null;
     } else {
       this.state.p2 = playerState;
-      // Notify P1 that opponent joined
+      // Notify both that opponent is connected
       this.sendTo("p1", { type: "opponent_joined" });
     }
 
@@ -156,6 +156,17 @@ export class LobbyDO implements DurableObject {
       case "ping":
         ws.send(JSON.stringify({ type: "pong", t0: msg.t0, t1: Date.now() }));
         break;
+
+      case "select_character": {
+        const player = slot === "p1" ? this.state.p1 : this.state.p2;
+        if (!player) break;
+        const char = msg.character === "miku" || msg.character === "teto" ? msg.character : "miku";
+        player.character = char as "miku" | "teto";
+        const otherSlot: PlayerSlot = slot === "p1" ? "p2" : "p1";
+        this.sendTo(otherSlot, { type: "opponent_character", character: char });
+        this.saveState();
+        break;
+      }
 
       case "ready":
         this.handleReady(slot);

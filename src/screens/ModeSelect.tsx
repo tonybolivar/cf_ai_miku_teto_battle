@@ -12,8 +12,6 @@ const DIFFICULTIES: { id: BotDifficulty; label: string; desc: string; color: str
 ];
 
 export default function ModeSelect({ onSelect }: ModeSelectProps) {
-  const [mode, setMode] = useState<GameMode | null>(null);
-
   return (
     <div style={{
       width: "100%", height: "100%", display: "flex", flexDirection: "column",
@@ -21,49 +19,20 @@ export default function ModeSelect({ onSelect }: ModeSelectProps) {
       fontFamily: '"Noto Sans JP", sans-serif',
     }}>
       <h2 style={{ color: "#FFF", fontSize: "2rem", marginBottom: 50, letterSpacing: 4 }}>
-        {mode === null ? "SELECT MODE" : "SELECT DIFFICULTY"}
+        SELECT DIFFICULTY
       </h2>
 
-      {mode === null ? (
-        <div style={{ display: "flex", gap: 40 }}>
+      <div style={{ display: "flex", gap: 30 }}>
+        {DIFFICULTIES.map((d) => (
           <ModeButton
-            label="VS BOT"
-            desc="Play against AI opponent"
-            color="#00FFFF"
-            onClick={() => setMode("bot")}
+            key={d.id}
+            label={d.label}
+            desc={d.desc}
+            color={d.color}
+            onClick={() => onSelect("bot", d.id)}
           />
-          <ModeButton
-            label="PVP"
-            desc="Battle a real player online"
-            color="#C24B99"
-            onClick={() => onSelect("pvp", null)}
-          />
-        </div>
-      ) : (
-        <div style={{ display: "flex", gap: 30 }}>
-          {DIFFICULTIES.map((d) => (
-            <ModeButton
-              key={d.id}
-              label={d.label}
-              desc={d.desc}
-              color={d.color}
-              onClick={() => onSelect("bot", d.id)}
-            />
-          ))}
-        </div>
-      )}
-
-      {mode !== null && (
-        <button
-          onClick={() => setMode(null)}
-          style={{
-            marginTop: 40, background: "none", border: "none", color: "#555",
-            cursor: "pointer", fontFamily: '"Noto Sans JP", sans-serif', fontSize: "0.9rem",
-          }}
-        >
-          &larr; BACK
-        </button>
-      )}
+        ))}
+      </div>
     </div>
   );
 }

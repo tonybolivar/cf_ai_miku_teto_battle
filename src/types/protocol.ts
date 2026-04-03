@@ -5,6 +5,7 @@ import type { Rating, Lane } from "./game";
 export type ClientMessage =
   | { type: "ping"; t0: number }
   | { type: "ready" }
+  | { type: "select_character"; character: string }
   | { type: "hit"; noteId: string; rating: Rating; lane: Lane }
   | { type: "miss"; noteId: string; lane: Lane }
   | { type: "hold_end"; noteId: string; completed: boolean }
@@ -16,6 +17,7 @@ export type ClientMessage =
 export type ServerMessage =
   | { type: "pong"; t0: number; t1: number }
   | { type: "opponent_joined" }
+  | { type: "opponent_character"; character: string }
   | { type: "opponent_ready" }
   | { type: "start"; songId: string; startAt: number }
   | { type: "opponent_update"; health: number; score: number; combo: number; lane: Lane; rating: string }

@@ -1,18 +1,9 @@
-import { useEffect } from "react";
-
 interface TitleScreenProps {
-  onStart: () => void;
+  onSingleplayer: () => void;
+  onMultiplayer: () => void;
 }
 
-export default function TitleScreen({ onStart }: TitleScreenProps) {
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Enter") onStart();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onStart]);
-
+export default function TitleScreen({ onSingleplayer, onMultiplayer }: TitleScreenProps) {
   return (
     <div style={{
       width: "100%", height: "100%", display: "flex", flexDirection: "column",
@@ -20,7 +11,7 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
       background: "url('/assets/title_bg.jpg') center/cover no-repeat #000",
       fontFamily: '"Noto Sans JP", sans-serif', position: "relative", overflow: "hidden",
     }}>
-      {/* Dark gradient overlay -- keeps art visible at top, readable at bottom */}
+      {/* Dark gradient overlay */}
       <div style={{
         position: "absolute", inset: 0,
         background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.9) 80%, #000 100%)",
@@ -46,14 +37,35 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
           RHYTHM BATTLE
         </h1>
 
-        {/* Start prompt */}
-        <p style={{
-          color: "#FFF", fontSize: "1.3rem", letterSpacing: 3,
-          animation: "blink 1s step-end infinite",
-          textShadow: "0 2px 8px rgba(0,0,0,0.8)",
-        }}>
-          PRESS ENTER
-        </p>
+        {/* Mode buttons */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
+          <button
+            onClick={onSingleplayer}
+            style={{
+              padding: "16px 60px", fontSize: "1.3rem", letterSpacing: 4,
+              background: "none", border: "2px solid #39C5BB88", borderRadius: 8,
+              color: "#FFF", cursor: "pointer", fontFamily: '"Noto Sans JP", sans-serif',
+              transition: "all 0.15s", textShadow: "0 2px 8px rgba(0,0,0,0.8)",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#39C5BB"; e.currentTarget.style.background = "#39C5BB15"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#39C5BB88"; e.currentTarget.style.background = "none"; }}
+          >
+            SINGLEPLAYER
+          </button>
+          <button
+            onClick={onMultiplayer}
+            style={{
+              padding: "14px 52px", fontSize: "1rem", letterSpacing: 3,
+              background: "none", border: "2px solid #C24B9988", borderRadius: 8,
+              color: "#aaa", cursor: "pointer", fontFamily: '"Noto Sans JP", sans-serif',
+              transition: "all 0.15s", textShadow: "0 2px 8px rgba(0,0,0,0.8)",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#C24B99"; e.currentTarget.style.color = "#FFF"; e.currentTarget.style.background = "#C24B9915"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#C24B9988"; e.currentTarget.style.color = "#aaa"; e.currentTarget.style.background = "none"; }}
+          >
+            MULTIPLAYER
+          </button>
+        </div>
 
         {/* Arrow hint */}
         <div style={{
@@ -65,10 +77,6 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
           <span style={{ color: "#F9393F", fontSize: "1.8rem", textShadow: "0 0 6px #F9393F" }}>&rarr;</span>
         </div>
       </div>
-
-      <style>{`
-        @keyframes blink { 50% { opacity: 0; } }
-      `}</style>
     </div>
   );
 }

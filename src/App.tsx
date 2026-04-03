@@ -5,7 +5,6 @@ import ModeSelect from "./screens/ModeSelect";
 import SongSelect from "./screens/SongSelect";
 import LobbyScreen from "./screens/LobbyScreen";
 import TrashTalkScreen from "./screens/TrashTalkScreen";
-import CountdownScreen from "./screens/CountdownScreen";
 import GameScreen from "./screens/GameScreen";
 import ResultsScreen from "./screens/ResultsScreen";
 import LeaderboardScreen from "./screens/LeaderboardScreen";
@@ -17,11 +16,10 @@ import type { Character, GameMode, BotDifficulty, Chart } from "./types/game";
 type Screen =
   | "title"
   | "charSelect"
-  | "modeSelect"
+  | "difficulty"
   | "songSelect"
   | "lobby"
   | "trashTalk"
-  | "countdown"
   | "game"
   | "results"
   | "leaderboard";
@@ -30,9 +28,8 @@ interface GameConfig {
   character: Character;
   opponentCharacter: Character;
   mode: GameMode;
-  botDifficulty: BotDifficulty | null;
+  botDifficulty: BotDifficulty;
   songId: string;
-  lobbyCode: string | null;
 }
 
 interface GameResult {
@@ -43,16 +40,13 @@ interface GameResult {
   playerMisses: number;
 }
 
-// Chart registry — songs will be loaded dynamically; test chart is always available
 const CHART_REGISTRY: Record<string, Chart> = {
   po_pi_po: PO_PI_PO_CHART,
   mesmerizer: MESMERIZER_CHART,
 };
 
-export async function loadChart(songId: string): Promise<Chart> {
+async function loadChart(songId: string): Promise<Chart> {
   if (CHART_REGISTRY[songId]) return CHART_REGISTRY[songId];
-
-  // Try to load from /charts/{songId}.json
   try {
     const resp = await fetch(`/charts/${songId}.json`);
     if (resp.ok) {
@@ -61,8 +55,6 @@ export async function loadChart(songId: string): Promise<Chart> {
       return chart;
     }
   } catch { /* fallback */ }
-
-  // Fallback to first available
   return PO_PI_PO_CHART;
 }
 
@@ -73,41 +65,58 @@ export default function App() {
     opponentCharacter: "teto",
     mode: "bot",
     botDifficulty: "medium",
-    songId: "test",
-    lobbyCode: null,
+    songId: "mesmerizer",
   });
   const [chart, setChart] = useState<Chart>(PO_PI_PO_CHART);
   const [result, setResult] = useState<GameResult | null>(null);
   const [pvpInfo, setPvpInfo] = useState<{ ws: WebSocket; slot: "p1" | "p2"; clockOffset: number; startAt: number } | null>(null);
 
+  // ── Singleplayer flow ──
+
   const handleCharSelect = useCallback((character: Character) => {
     const opponent: Character = character === "miku" ? "teto" : "miku";
-    setConfig((c) => ({ ...c, character, opponentCharacter: opponent }));
-    setScreen("modeSelect");
+    setConfig((c) => ({ ...c, character, opponentCharacter: opponent, mode: "bot" }));
+    setScreen("difficulty");
   }, []);
 
-  const handleModeSelect = useCallback((mode: GameMode, difficulty: BotDifficulty | null) => {
-    setConfig((c) => ({ ...c, mode, botDifficulty: difficulty }));
+  const handleDifficulty = useCallback((difficulty: BotDifficulty) => {
+    setConfig((c) => ({ ...c, botDifficulty: difficulty }));
     setScreen("songSelect");
   }, []);
 
   const handleSongSelect = useCallback(async (songId: string) => {
     setConfig((c) => ({ ...c, songId }));
-    const loadedChart = await loadChart(songId);
-    setChart(loadedChart);
-    if (config.mode === "pvp") {
-      setScreen("lobby");
-    } else {
-      setScreen("trashTalk");
-    }
-  }, [config.mode]);
+    const loaded = await loadChart(songId);
+    setChart(loaded);
+    setScreen("trashTalk");
+  }, []);
+
+  // ── Multiplayer flow (lobby handles char select + song) ──
+
+  const handlePvpGameStart = useCallback(async (
+    ws: WebSocket, slot: "p1" | "p2",
+    playerChar: Character, opponentChar: Character,
+    songId: string, clockOffset: number, startAt: number,
+  ) => {
+    const loaded = await loadChart(songId);
+    setChart(loaded);
+    setConfig((c) => ({
+      ...c,
+      character: playerChar,
+      opponentCharacter: opponentChar,
+      mode: "pvp",
+      songId,
+    }));
+    setPvpInfo({ ws, slot, clockOffset, startAt });
+    setScreen("game");
+  }, []);
+
+  // ── Common ──
 
   const handleGameOver = useCallback((
     winner: "player" | "opponent" | "draw",
-    playerScore: number,
-    opponentScore: number,
-    maxCombo: number,
-    misses: number,
+    playerScore: number, opponentScore: number,
+    maxCombo: number, misses: number,
   ) => {
     setResult({ winner, playerScore, opponentScore, playerCombo: maxCombo, playerMisses: misses });
     setScreen("results");
@@ -115,13 +124,18 @@ export default function App() {
 
   switch (screen) {
     case "title":
-      return <TitleScreen onStart={() => setScreen("charSelect")} />;
+      return (
+        <TitleScreen
+          onSingleplayer={() => setScreen("charSelect")}
+          onMultiplayer={() => setScreen("lobby")}
+        />
+      );
 
     case "charSelect":
       return <CharacterSelect onSelect={handleCharSelect} />;
 
-    case "modeSelect":
-      return <ModeSelect onSelect={handleModeSelect} />;
+    case "difficulty":
+      return <ModeSelect onSelect={(_, diff) => handleDifficulty(diff ?? "medium")} />;
 
     case "songSelect":
       return <SongSelect playerCharacter={config.character} mode={config.mode} onSelect={handleSongSelect} />;
@@ -129,15 +143,8 @@ export default function App() {
     case "lobby":
       return (
         <LobbyScreen
-          playerCharacter={config.character}
-          songId={config.songId}
-          mode={config.mode}
-          botDifficulty={config.botDifficulty ?? undefined}
-          onGameStart={(ws, slot, clockOffset, startAt) => {
-            setPvpInfo({ ws, slot, clockOffset, startAt });
-            setScreen("game");
-          }}
-          onCancel={() => setScreen("songSelect")}
+          onGameStart={handlePvpGameStart}
+          onCancel={() => setScreen("title")}
         />
       );
 
@@ -154,11 +161,7 @@ export default function App() {
     }
 
     case "game": {
-      // Default VRMs, overridden by song-specific assets
-      const defaultVrm: Record<string, string> = {
-        miku: "/assets/miku.vrm",
-        teto: "/assets/teto.vrm",
-      };
+      const defaultVrm: Record<string, string> = { miku: "/assets/miku.vrm", teto: "/assets/teto.vrm" };
       const songAssets = SONG_ASSETS[config.songId];
       const playerVrm = songAssets?.vrmUrls?.[config.character] ?? defaultVrm[config.character];
       const opponentVrm = songAssets?.vrmUrls?.[config.opponentCharacter] ?? defaultVrm[config.opponentCharacter];
@@ -169,7 +172,7 @@ export default function App() {
           playerCharacter={config.character}
           opponentCharacter={config.opponentCharacter}
           mode={config.mode}
-          botDifficulty={config.botDifficulty ?? "medium"}
+          botDifficulty={config.botDifficulty}
           playerVrmUrl={playerVrm}
           opponentVrmUrl={opponentVrm}
           playerStageUrl={songAssets?.noStage ? undefined : "/assets/stage_teto.glb"}
@@ -181,10 +184,7 @@ export default function App() {
     }
 
     case "results": {
-      const closePvp = () => {
-        pvpInfo?.ws?.close();
-        setPvpInfo(null);
-      };
+      const closePvp = () => { pvpInfo?.ws?.close(); setPvpInfo(null); };
       return (
         <ResultsScreen
           winner={result?.winner ?? "draw"}
