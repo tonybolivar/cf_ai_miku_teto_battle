@@ -6,3 +6,6 @@ dist/
 .mf/
 .env
 public/assets/mesmerizer_dance.fbx
+
+# Yakuza game assets (copyrighted)
+public/assets/yakuza/
