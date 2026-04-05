@@ -16,6 +16,7 @@ interface GameScreenProps {
   playerStageUrl?: string;
   opponentStageUrl?: string;
   songId?: string;
+  kiryuMode?: boolean;
   pvpInfo?: { ws: WebSocket; slot: "p1" | "p2"; clockOffset: number; startAt: number };
   onGameOver: (winner: "player" | "opponent" | "draw", playerScore: number, opponentScore: number, maxCombo: number, misses: number) => void;
 }
@@ -31,6 +32,7 @@ export default function GameScreen({
   playerStageUrl,
   opponentStageUrl,
   songId,
+  kiryuMode,
   pvpInfo,
   onGameOver,
 }: GameScreenProps) {
@@ -90,6 +92,7 @@ export default function GameScreen({
       playerStageUrl,
       opponentStageUrl,
       songId,
+      kiryuMode,
       pvpWs: pvpInfo?.ws,
       pvpSlot: pvpInfo?.slot,
       pvpClockOffset: pvpInfo?.clockOffset,

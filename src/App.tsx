@@ -180,6 +180,7 @@ export default function App() {
           opponentVrmUrl={opponentVrm}
           playerStageUrl={songAssets?.noStage ? undefined : "/assets/stage_teto.glb"}
           songId={config.songId}
+          kiryuMode={kiryuMode}
           pvpInfo={config.mode === "pvp" ? pvpInfo ?? undefined : undefined}
           onGameOver={handleGameOver}
         />

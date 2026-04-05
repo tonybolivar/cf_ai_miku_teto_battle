@@ -9,7 +9,8 @@ import { VRMManager } from "./VRMManager";
 import { StageManager } from "./StageManager";
 import { BotPlayer } from "./BotPlayer";
 import { soundFX } from "./SoundFX";
-import { SONG_ASSETS } from "../data/songs";
+import { SONG_ASSETS, KIRYU_SONG_ASSETS } from "../data/songs";
+import type { SongAssets } from "../data/songs";
 import { loadFBXDance } from "./FBXDanceLoader";
 import {
   LANE_COLORS,
@@ -43,6 +44,7 @@ export interface GameLoopConfig {
   playerStageUrl?: string;
   opponentStageUrl?: string;
   songId?: string;
+  kiryuMode?: boolean;
   pvpWs?: WebSocket;
   pvpSlot?: "p1" | "p2";
   pvpClockOffset?: number;
@@ -113,7 +115,9 @@ export class GameLoop {
     });
 
     // Initialize bot if in bot mode (skip for solo songs -- no opponent to fight)
-    const songAssets = this.config.songId ? SONG_ASSETS[this.config.songId] : undefined;
+    const resolveSongAssets = (id: string): SongAssets | undefined =>
+      (this.config.kiryuMode && KIRYU_SONG_ASSETS[id]) || SONG_ASSETS[id];
+    const songAssets = this.config.songId ? resolveSongAssets(this.config.songId) : undefined;
     const isSolo = !!songAssets?.soloCharacter;
     if (!isSolo && this.config.mode !== "pvp" && this.config.botDifficulty) {
       this.bot = new BotPlayer(this.config.botDifficulty);
@@ -134,7 +138,7 @@ export class GameLoop {
       this.vrm = new VRMManager(this.config.vrmCanvas);
 
       const songId = this.config.songId;
-      const songAssets = songId ? SONG_ASSETS[songId] : undefined;
+      const songAssets = songId ? resolveSongAssets(songId) : undefined;
 
       // Load GLB stage (unless song has video background)
       if (this.config.playerStageUrl) {
