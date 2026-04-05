@@ -10,7 +10,7 @@ import ResultsScreen from "./screens/ResultsScreen";
 import LeaderboardScreen from "./screens/LeaderboardScreen";
 import { PO_PI_PO_CHART } from "./data/charts/po_pi_po";
 import { MESMERIZER_CHART } from "./data/charts/mesmerizer";
-import { SONG_LIST, SONG_ASSETS } from "./data/songs";
+import { SONG_LIST, SONG_ASSETS, KIRYU_SONG_ASSETS } from "./data/songs";
 import { applyDifficulty } from "./utils/chartDifficulty";
 import type { Character, GameMode, BotDifficulty, Chart } from "./types/game";
 
@@ -71,6 +71,7 @@ export default function App() {
   const [chart, setChart] = useState<Chart>(PO_PI_PO_CHART);
   const [result, setResult] = useState<GameResult | null>(null);
   const [pvpInfo, setPvpInfo] = useState<{ ws: WebSocket; slot: "p1" | "p2"; clockOffset: number; startAt: number } | null>(null);
+  const [kiryuMode, setKiryuMode] = useState(false);
 
   // ── Singleplayer flow ──
 
@@ -129,6 +130,7 @@ export default function App() {
         <TitleScreen
           onSingleplayer={() => setScreen("charSelect")}
           onMultiplayer={() => setScreen("lobby")}
+          onKiryuToggle={setKiryuMode}
         />
       );
 
@@ -163,7 +165,7 @@ export default function App() {
 
     case "game": {
       const defaultVrm: Record<string, string> = { miku: "/assets/miku.vrm", teto: "/assets/teto.vrm" };
-      const songAssets = SONG_ASSETS[config.songId];
+      const songAssets = (kiryuMode && KIRYU_SONG_ASSETS[config.songId]) || SONG_ASSETS[config.songId];
       const playerVrm = songAssets?.vrmUrls?.[config.character] ?? defaultVrm[config.character];
       const opponentVrm = songAssets?.vrmUrls?.[config.opponentCharacter] ?? defaultVrm[config.opponentCharacter];
 

@@ -37,6 +37,7 @@ export const SONG_LIST: SongMeta[] = [
 export interface SongAssets {
   vrmUrls?: Record<string, string>;
   mmdModels?: Record<string, { pmx: string; vmd: string[] }>;
+  yakuzaModels?: Record<string, { meshPar: string; commonPar: string; vmd: string[]; gmt?: string }>;
   mmdStage?: string;
   mmdCamera?: string; // VMD camera animation
   backgroundVideo?: string;
@@ -69,5 +70,21 @@ export const SONG_ASSETS: Record<string, SongAssets> = {
     },
     backgroundVideo: "/assets/bg_mesmerizer.mp4",
     noStage: true,
+  },
+};
+
+/** Kiryu mode overrides — activated by secret code on title screen */
+export const KIRYU_SONG_ASSETS: Record<string, SongAssets> = {
+  po_pi_po: {
+    yakuzaModels: {
+      miku: {
+        meshPar: "/assets/yakuza/kiryu/mesh.par",
+        commonPar: "/assets/yakuza/kiryu/tex_common_w64.par",
+        vmd: ["/assets/vmd/miku_popipo.vmd"],
+      },
+    },
+    mmdStage: "/assets/mmd/popipo_stage/Stage.pmx",
+    noStage: true,
+    soloCharacter: "miku",
   },
 };

@@ -1,9 +1,13 @@
+import { useState } from "react";
+
 interface TitleScreenProps {
   onSingleplayer: () => void;
   onMultiplayer: () => void;
+  onKiryuToggle?: (active: boolean) => void;
 }
 
-export default function TitleScreen({ onSingleplayer, onMultiplayer }: TitleScreenProps) {
+export default function TitleScreen({ onSingleplayer, onMultiplayer, onKiryuToggle }: TitleScreenProps) {
+  const [kiryuMode, setKiryuMode] = useState(false);
   return (
     <div style={{
       width: "100%", height: "100%", display: "flex", flexDirection: "column",
@@ -80,6 +84,40 @@ export default function TitleScreen({ onSingleplayer, onMultiplayer }: TitleScre
           <span style={{ color: "#F9393F", fontSize: "1.8rem", textShadow: "0 0 6px #F9393F" }}>&rarr;</span>
         </div>
       </div>
+
+      {/* Secret Kiryu toggle — bottom right */}
+      <button
+        onClick={() => {
+          setKiryuMode((prev) => {
+            const next = !prev;
+            onKiryuToggle?.(next);
+            return next;
+          });
+        }}
+        style={{
+          position: "absolute", bottom: 16, right: 16, zIndex: 2,
+          background: "none", border: "none", cursor: "pointer",
+          fontSize: "1.2rem", opacity: kiryuMode ? 1 : 0.15,
+          transition: "opacity 0.3s",
+          filter: kiryuMode ? "drop-shadow(0 0 8px #FFD700)" : "none",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = kiryuMode ? "1" : "0.15"; }}
+        title="Dragon of Dojima Mode"
+      >
+        {kiryuMode ? "🐉" : "🐲"}
+      </button>
+
+      {/* Kiryu mode banner */}
+      {kiryuMode && (
+        <div style={{
+          position: "absolute", bottom: 48, right: 16, zIndex: 2,
+          color: "#FFD700", fontSize: "0.7rem", letterSpacing: 2,
+          textShadow: "0 0 8px #FFD700",
+        }}>
+          KIRYU MODE
+        </div>
+      )}
     </div>
   );
 }

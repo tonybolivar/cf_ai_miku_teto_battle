@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@pixiv/three-vrm": "^3.5.1",
+    "@three-yakuza/par-parser": "^0.3.0",
+    "@three-yakuza/three-gmd": "^0.3.0",
+    "@three-yakuza/three-gmt": "^0.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.183.2",

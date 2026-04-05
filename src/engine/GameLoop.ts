@@ -144,8 +144,34 @@ export class GameLoop {
         stage.showStage(this.config.playerCharacter);
       }
 
-      // Check if song uses MMD models (PMX + VMD, native, no retargeting)
-      if (songAssets?.mmdModels) {
+      // Check if song uses Yakuza (SEGA) models via @three-yakuza
+      if (songAssets?.yakuzaModels) {
+        const isSolo = !!songAssets.soloCharacter;
+        const playerYakuza = songAssets.yakuzaModels[this.config.playerCharacter];
+        const opponentYakuza = isSolo ? undefined : songAssets.yakuzaModels[this.config.opponentCharacter];
+
+        const yakuzaLoads: Promise<void>[] = [];
+        if (playerYakuza) {
+          const pos = new THREE.Vector3(isSolo ? 0 : -0.5, 0, 0);
+          yakuzaLoads.push(this.vrm.loadYakuzaCharacter(
+            "player", playerYakuza.meshPar, playerYakuza.commonPar, playerYakuza.vmd, pos, playerYakuza.gmt,
+          ));
+        }
+        if (opponentYakuza) {
+          const pos = new THREE.Vector3(0.5, 0, 0);
+          yakuzaLoads.push(this.vrm.loadYakuzaCharacter(
+            "opponent", opponentYakuza.meshPar, opponentYakuza.commonPar, opponentYakuza.vmd, pos,
+          ));
+        }
+
+        // Load MMD stage if specified
+        if (songAssets.mmdStage) {
+          yakuzaLoads.push(this.vrm.loadMMDStage(songAssets.mmdStage));
+        }
+
+        await Promise.all(yakuzaLoads);
+        this.vrm.setCameraSolo();
+      } else if (songAssets?.mmdModels) {
         const isSolo = !!songAssets.soloCharacter;
         const hasCamera = !!songAssets.mmdCamera;
         // Use native MMD scale when camera VMD is present (camera expects MMD coords)

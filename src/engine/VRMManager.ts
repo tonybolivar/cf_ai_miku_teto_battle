@@ -2,6 +2,9 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRM, VRMExpressionPresetName, VRMHumanBoneName } from "@pixiv/three-vrm";
 import { loadMMDCharacter, type MMDCharacter } from "./MMDDanceLoader";
+import { loadYakuzaModel } from "./YakuzaLoader";
+import { loadVMDForSEGA } from "./VMDSEGALoader";
+import { GMTLoader } from "@three-yakuza/three-gmt";
 import type { Lane } from "../types/game";
 import type { StageManager } from "./StageManager";
 /** Linear interpolation sample from a keyframe track */
@@ -42,6 +45,12 @@ interface CharacterState {
   hasDance: boolean;
 }
 
+interface YakuzaCharState {
+  scene: THREE.Group;
+  mixer: THREE.AnimationMixer;
+  action: THREE.AnimationAction | null;
+}
+
 /**
  * Manages VRM character models and owns the shared WebGL renderer.
  * Renders stage scene (background) then character scene (foreground)
@@ -57,6 +66,7 @@ export class VRMManager {
 
   private characters = new Map<string, CharacterState>();
   private mmdCharacters = new Map<string, MMDCharacter>();
+  private yakuzaCharacters = new Map<string, YakuzaCharState>();
 
   // Fade overlay (for stage crossfade)
   private fadeQuad: THREE.Mesh | null = null;
@@ -162,6 +172,44 @@ export class VRMManager {
     console.log(`[VRM] MMD character "${id}" loaded, nativeScale=${nativeScale}`);
   }
 
+  /** Load a Yakuza (SEGA) model from PAR archives with animation */
+  async loadYakuzaCharacter(
+    id: string,
+    meshParUrl: string,
+    commonTexParUrl: string,
+    vmdUrls: string[],
+    position: THREE.Vector3,
+    gmtUrl?: string,
+  ): Promise<void> {
+    const yakuza = await loadYakuzaModel(meshParUrl, commonTexParUrl);
+    yakuza.scene.position.copy(position);
+    this.charScene.add(yakuza.scene);
+
+    // SEGA PBR materials need sRGB output — switch renderer for this session
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const mixer = new THREE.AnimationMixer(yakuza.scene);
+    let action: THREE.AnimationAction | null = null;
+
+    // Prefer GMT (native SEGA animation) over VMD retarget
+    if (gmtUrl) {
+      const gmtLoader = new GMTLoader();
+      const gmtResult = await gmtLoader.loadAsync(gmtUrl);
+      if (gmtResult.animations.length > 0) {
+        action = mixer.clipAction(gmtResult.animations[0]);
+        action.play();
+        console.log(`[Yakuza] GMT animation: ${gmtResult.animations[0].tracks.length} tracks, ${gmtResult.animations[0].duration.toFixed(1)}s`);
+      }
+    } else if (vmdUrls.length > 0) {
+      const clip = await loadVMDForSEGA(vmdUrls[0], yakuza.scene);
+      action = mixer.clipAction(clip);
+      action.play();
+    }
+
+    this.yakuzaCharacters.set(id, { scene: yakuza.scene, mixer, action });
+    console.log(`[VRM] Yakuza character "${id}" loaded`);
+  }
+
   /** Apply a pre-built AnimationClip as the dance for a character */
   applyDance(characterId: string, clip: THREE.AnimationClip): void {
     const char = this.characters.get(characterId);
@@ -186,10 +234,16 @@ export class VRMManager {
         char.mixer.setTime(offsetSeconds);
       }
     }
+    for (const [, yk] of this.yakuzaCharacters) {
+      if (yk.action) {
+        yk.mixer.setTime(offsetSeconds);
+      }
+    }
   }
 
   triggerSing(characterId: string, lane: Lane): void {
     if (this.mmdCharacters.has(characterId)) return; // MMD characters have their own dance
+    if (this.yakuzaCharacters.has(characterId)) return; // Yakuza characters have their own dance
     const char = this.characters.get(characterId);
     if (!char || char.hasDance) return;
     char.currentPose = lane;
@@ -202,6 +256,11 @@ export class VRMManager {
     // Update MMD characters (native animation, no manual poses)
     for (const [, mmd] of this.mmdCharacters) {
       mmd.helper.update(delta);
+    }
+
+    // Update Yakuza characters
+    for (const [, yk] of this.yakuzaCharacters) {
+      yk.mixer.update(delta);
     }
 
     // Update camera animation if present
@@ -332,7 +391,7 @@ export class VRMManager {
     }
 
     // 2. Render characters on top (depth buffer cleared so characters always show)
-    if (this.characters.size > 0 || this.mmdCharacters.size > 0) {
+    if (this.characters.size > 0 || this.mmdCharacters.size > 0 || this.yakuzaCharacters.size > 0) {
       this.renderer.clearDepth();
       this.renderer.render(this.charScene, this.charCamera);
     }
@@ -355,6 +414,16 @@ export class VRMManager {
       mesh.scale.setScalar(0.08);
       mesh.position.set(0, 0, -1);
     }
+    // Prevent double-gamma when renderer uses SRGBColorSpace:
+    // mark toon material maps as linear so the renderer's sRGB encode is the only conversion.
+    mesh.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const mat of mats) {
+          if (mat.map) mat.map.colorSpace = THREE.LinearSRGBColorSpace;
+        }
+      }
+    });
     this.charScene.add(mesh);
     console.log(`[VRM] MMD stage loaded: ${pmxUrl}, nativeScale=${nativeScale}`);
   }
@@ -420,6 +489,17 @@ export class VRMManager {
       });
     }
     this.characters.clear();
+    for (const [, yk] of this.yakuzaCharacters) {
+      this.charScene.remove(yk.scene);
+      yk.scene.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry.dispose();
+          if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
+          else obj.material.dispose();
+        }
+      });
+    }
+    this.yakuzaCharacters.clear();
     this.stageManager?.dispose();
     this.renderer.dispose();
   }
